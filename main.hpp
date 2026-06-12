@@ -5,15 +5,17 @@
 #include <vector>
 #include <string>
 
-// Подтягиваем типы данных, перечисления и классы (Vault17ClassManager, IsometricCamera)
+// Подтягиваем типы данных, перечисления и классы
 #include "Tactics.hpp"
 
-// Forward declarations системных функций, чтобы их видел WinMain
+// Forward declarations системных функций
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 bool CheckWorldCollision(float nextX, float nextY, float radius);
 void UpdateHelldiversCamera(float deltaTime);
+ScreenPoint PixelsToNDC(float x, float y, float width, float height);
+void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments);
 
-// ОБЪЯВЛЕНИЕ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ (Используем extern для линковщика)
+// ОБЪЯВЛЕНИЕ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ (extern для линковщика)
 extern UnitMode playerMode;
 extern Vector3D playerPos;
 extern float playerHealth;
@@ -37,7 +39,7 @@ extern Vector3D towerPosition;
 extern float playerErosionLevel;
 extern bool isAiming;
 
-// СИСТЕМНЫЕ УКАЗАТЕЛИ DIRECTX 11
+// УКАЗАТЕЛИ DIRECTX 11
 extern ID3D11Device*           g_pd3dDevice;
 extern ID3D11DeviceContext*    g_pd3dDeviceContext;
 extern IDXGISwapChain*         g_pSwapChain;
@@ -51,4 +53,3 @@ extern ID3D11Buffer*           g_pVertexBuffer;
 extern int currentSectorMap[MAP_WIDTH][MAP_HEIGHT];
 extern int wallDurability[MAP_WIDTH][MAP_HEIGHT];
 extern float etherErosionMap[MAP_WIDTH][MAP_HEIGHT];
-
