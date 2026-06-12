@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Build Video Game Izom (Pure DX11)",
+            "command": "cl.exe",
+            "args": [
+                "/std:c++17",
+                "/EHsc",
+                "main.cpp",
+                "/link",
+                "user32.lib",
+                "gdi32.lib",
+                "d3d11.lib",
+                "dxgi.lib",
+                "d3dcompiler.lib"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
