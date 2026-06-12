@@ -1,9 +1,9 @@
 #include "main.hpp"
 #include "Enemies.hpp"
+#include "Player.hpp"
 #include <cmath>
 #include <algorithm>
 
-// Генератор бесконечного роя Верминов за границами видимости экрана
 void SpawnVerminGrid(float deltaTime) {
     enemySpawnTimer += deltaTime;
     if (enemySpawnTimer >= 1.2f) {
@@ -16,7 +16,6 @@ void SpawnVerminGrid(float deltaTime) {
     }
 }
 
-// Поток логики ИИ Верминов, каскадное разрушение инфраструктуры Убежища 17
 void UpdateVerminAI(float deltaTime) {
     for (auto& e : enemies) {
         if (!e.isAlive) continue;
@@ -29,59 +28,59 @@ void UpdateVerminAI(float deltaTime) {
         float tdy = towerPosition.y - e.position.y;
         float distToTower = std::sqrt(tdx * tdx + tdy * tdy);
 
-        // Учет каноничной Маскировки или Фазового сдвига Пилота
+        // Проверяем тактическую маскировку или фазовый сдвиг Пилота
         bool isPlayerHidden = gameClasses.isTacticalActive && 
             (gameClasses.GetActivePilotClass() == PilotClass::Cloak || 
              gameClasses.GetActivePilotClass() == PilotClass::PhaseShift);
 
+        // Если пилот скрылся в невидимости или фазе — Вермины теряют его из вида
         if (isPlayerHidden && !titan.isPiloted) {
-            dist = 999.0f; // Рой полностью теряет Скаута из виду
+            dist = 999.0f; 
         }
 
-        // Если Вермины близко к Вышке реле — они грызут её, игнорируя игрока
+        // Агро-логика Верминов: приоритет вышки реле, если они в радиусе 4 метров
         if (distToTower < 4.0f && regionalGrid.towerSyncRecovered) {
             if (distToTower > 0.4f) {
                 e.position.x += (tdx / distToTower) * e.speed * deltaTime;
                 e.position.y += (tdy / distToTower) * e.speed * deltaTime;
             } else {
+                // Вермины наносят урон инфраструктуре Убежища 17
                 regionalGrid.towerHealth -= 15.0f * deltaTime;
                 
-                // Каскадная нормализация состояний (NormalizeWorldFieldState) из лора
+                // Каскадная нормализация состояний (NormalizeWorldFieldState)
                 if (regionalGrid.towerHealth <= 0.0f) {
                     regionalGrid.towerHealth = 0.0f;
-                    regionalGrid.towerSyncRecovered = false;  
-                    regionalGrid.localRelayAvailable = false; 
-                    regionalGrid.feyRingGateUnlocked = false; // Врата FeyRing блокируются
+                    regionalGrid.towerSyncRecovered = false;  // Вышка связи уничтожена!
+                    regionalGrid.localRelayAvailable = false; // Локальное реле Pip-Pad падает
+                    regionalGrid.feyRingGateUnlocked = false; // Врата эвакуации FeyRing блокируются
                 }
             }
         } else {
-            // Преследование Скаута или Танка
+            // Преследование пилота или Танка с ИИ
             if (dist > 0.35f) {
                 e.position.x += (vx / dist) * e.speed * deltaTime;
                 e.position.y += (vy / dist) * e.speed * deltaTime;
             } else {
-                // Распределение повреждений по 4 внутренним узлам Танка (Ядро, Гусеницы, Турель, Сенсоры)
+                // Распределение повреждений по 4 внутренним узлам Танка
                 if (playerMode == UnitMode::Titan) {
                     int targetComponent = rand() % 4;
                     float damageAmt = 15.0f * deltaTime;
                     
-                    if (targetComponent == 0) titan.systems.tracksCondition -= damageAmt;
-                    else if (targetComponent == 1) titan.systems.turretStatus -= damageAmt;   
-                    else if (targetComponent == 2) titan.systems.sensorLink -= damageAmt;     
-                    else titan.systems.coreEnergy -= damageAmt;                               
+                    if (targetComponent == 0) titan.systems.tracksCondition -= damageAmt; // Поломка ходовой
+                    else if (targetComponent == 1) titan.systems.turretStatus -= damageAmt;   // Поломка турели пушки
+                    else if (targetComponent == 2) titan.systems.sensorLink -= damageAmt;     // Вывод из строя реле
+                    else titan.systems.coreEnergy -= damageAmt;                               // Повреждение ядра
                     
-                    // Пересчет общего здоровья Танка на основе износа его узлов
+                    // Каскадный пересчет общего здоровья Танка на основе износа его узлов
                     playerHealth = (titan.systems.coreEnergy + titan.systems.tracksCondition + titan.systems.turretStatus + titan.systems.sensorLink) * 1.5f;
-                    if (titan.systems.coreEnergy <= 0.0f) playerHealth = 0.0f; 
                 } else {
+                    // Обычный укус Скаута вне брони Танка
                     playerHealth -= 25.0f * deltaTime;
                 }
                 if (playerHealth < 0.0f) playerHealth = 0.0f;
             }
         }
     }
-    
-    // Очистка уничтоженных Верминов из контейнера памяти
     enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [](const Enemy& enemyObj) { 
         return !enemyObj.isAlive; 
     }), enemies.end());

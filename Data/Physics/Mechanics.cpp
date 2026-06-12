@@ -5,49 +5,64 @@
 #include <algorithm>
 
 void ProcessGameMechanics(float deltaTime) {
-    // 1. СИМУЛЯЦИЯ БАЛЛИСТИКИ И АРТИЛЛЕРИИ ПУЛЬ
+    // 1. ОБНОВЛЕНИЕ БАЛЛИСТИКИ И ТРАЕКТОРИЙ СНАРЯДОВ
     for (auto& b : bullets) {
         float moveStep = b.speed * deltaTime;
-
+        
         if (b.type == BulletType::ArtilleryMissile) {
-            float bdx = b.targetPos.x - b.current.x; float bdy = b.targetPos.y - b.current.y;
+            float bdx = b.targetPos.x - b.current.x;
+            float bdy = b.targetPos.y - b.current.y;
             float distToTarget = std::sqrt(bdx * bdx + bdy * bdy);
+            
             if (distToTarget > 0.2f) {
-                b.current.x += (bdx / distToTarget) * moveStep; b.current.y += (bdy / distToTarget) * moveStep;
+                b.current.x += (bdx / distToTarget) * moveStep;
+                b.current.y += (bdy / distToTarget) * moveStep;
                 b.distanceTraveled += moveStep;
-                float progress = b.distanceTraveled / 12.0f;
+                
+                float totalExpectedDist = 12.0f;
+                float progress = b.distanceTraveled / totalExpectedDist;
                 if (progress > 1.0f) progress = 1.0f;
                 b.current.z = std::sin(progress * 3.1415926f) * 4.0f;
-            } else { b.isAlive = false; }
+            } else { 
+                b.isAlive = false; 
+            }
         } else {
-            b.current.x += b.direction.x * moveStep; b.current.y += b.direction.y * moveStep;
+            b.current.x += b.direction.x * moveStep;
+            b.current.y += b.direction.y * moveStep;
             b.distanceTraveled += moveStep;
         }
 
         if (b.distanceTraveled >= b.maxDistance) b.isAlive = false;
 
-        // Разрушаемость стен завалов снарядами
-        int mX = (int)b.current.x; int mY = (int)b.current.y;
+        // Инженерный просчет разрушаемости завалов по сетке
+        int mX = (int)b.current.x; 
+        int mY = (int)b.current.y;
         if (mX >= 0 && mX < MAP_WIDTH && mY >= 0 && mY < MAP_HEIGHT) {
             if (currentSectorMap[mX][mY] == 1) {
                 b.isAlive = false;
                 int damageToWall = (b.type == BulletType::BallisticMissile || b.type == BulletType::ArtilleryMissile) ? 50 : 8;
                 wallDurability[mX][mY] -= damageToWall;
-                if (wallDurability[mX][mY] <= 0) { currentSectorMap[mX][mY] = 0; score += 50; }
+                if (wallDurability[mX][mY] <= 0) { 
+                    currentSectorMap[mX][mY] = 0; 
+                    score += 50; 
+                }
                 continue;
             }
         }
 
-        // Попадания во врагов
+        // Сканирование попаданий во врагов с учетом сплеш-урона
         for (auto& e : enemies) {
             if (!e.isAlive) continue;
-            float edx = e.position.x - b.current.x; float edy = e.position.y - b.current.y;
+            float edx = e.position.x - b.current.x; 
+            float edy = e.position.y - b.current.y;
+            
             if (std::sqrt(edx * edx + edy * edy) <= e.radius) {
                 b.isAlive = false;
                 if (b.type == BulletType::BallisticMissile || b.type == BulletType::ArtilleryMissile) {
                     for (auto& splashEnemy : enemies) {
                         if (!splashEnemy.isAlive) continue;
-                        float sdx = splashEnemy.position.x - b.current.x; float sdy = splashEnemy.position.y - b.current.y;
+                        float sdx = splashEnemy.position.x - b.current.x;
+                        float sdy = splashEnemy.position.y - b.current.y;
                         if (std::sqrt(sdx * sdx + sdy * sdy) <= b.splashRadius) {
                             splashEnemy.health -= 85.0f;
                             if (splashEnemy.health <= 0.0f) { splashEnemy.isAlive = false; score += 150; }
@@ -61,27 +76,42 @@ void ProcessGameMechanics(float deltaTime) {
             }
         }
     }
+    bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& bulletObj) { 
+        return !bulletObj.isAlive; 
+    }), bullets.end());
 
-    // 2. ПОТОК ЛОГИКИ АВТОНОМНОГО СОЮЗНИКА ТАНКА С ИИ
+    // 2. ПОТОК ЛОГИКИ АВТОНОМНОГО СОЮЗНИКА (ТАНК С ИИ)
     if (!titan.isPiloted) {
-        float tdx_t = playerPos.x - titan.position.x; float tdy_t = playerPos.y - titan.position.y;
+        float tdx_t = playerPos.x - titan.position.x;
+        float tdy_t = playerPos.y - titan.position.y;
         float distToPlayer = std::sqrt(tdx_t * tdx_t + tdy_t * tdy_t);
 
-        Enemy* closestTarget = nullptr; float closestDist = 8.0f;
+        Enemy* closestTarget = nullptr;
+        float closestDist = 8.0f;
         for (auto& e : enemies) {
             if (!e.isAlive) continue;
-            float edx = e.position.x - titan.position.x; float edy = e.position.y - titan.position.y;
+            float edx = e.position.x - titan.position.x;
+            float edy = e.position.y - titan.position.y;
             float eDist = std::sqrt(edx * edx + edy * edy);
-            if (eDist < closestDist) { closestDist = eDist; closestTarget = &e; }
+            if (eDist < closestDist) {
+                closestDist = eDist;
+                closestTarget = &e;
+            }
         }
 
-        if (closestTarget != nullptr && titan.fireCooldown <= 0.0f) {
-            Bullet tb; tb.start = titan.position; tb.current = titan.position;
-            float bdx_t = closestTarget->position.x - titan.position.x; float bdy_t = closestTarget->position.y - titan.position.y;
-            float bLen = std::sqrt(bdx_t * bdx_t + bdy_t * bdy_t);
-            if (bLen > 0.1f) {
-                tb.direction = { bdx_t / bLen, bdy_t / bLen, 0.0f };
-                bullets.push_back(tb); titan.fireCooldown = 0.12f;
+        if (closestTarget != nullptr) {
+            if (titan.fireCooldown <= 0.0f) {
+                Bullet tb;
+                tb.start = titan.position;
+                tb.current = titan.position;
+                float bdx_t = closestTarget->position.x - titan.position.x;
+                float bdy_t = closestTarget->position.y - titan.position.y;
+                float bLen = std::sqrt(bdx_t * bdx_t + bdy_t * bdy_t);
+                if (bLen > 0.1f) {
+                    tb.direction = { bdx_t / bLen, bdy_t / bLen, 0.0f };
+                    bullets.push_back(tb);
+                    titan.fireCooldown = 0.12f;
+                }
             }
         }
         if (titan.fireCooldown > 0.0f) titan.fireCooldown -= deltaTime;
@@ -97,13 +127,18 @@ void ProcessGameMechanics(float deltaTime) {
     }
 
     // 3. РАСЧЕТ НАКОПЛЕНИЯ ЭФИРНОЙ ЭРОЗИИ (ETHER EROSION) СКАУТА
-    int currentTileX = (int)playerPos.x; int currentTileY = (int)playerPos.y;
+    int currentTileX = (int)playerPos.x;
+    int currentTileY = (int)playerPos.y;
     if (currentTileX >= 0 && currentTileX < MAP_WIDTH && currentTileY >= 0 && currentTileY < MAP_HEIGHT) {
         float currentZoneErosion = etherErosionMap[currentTileX][currentTileY];
         if (titan.isPiloted) {
             playerErosionLevel -= 12.0f * deltaTime;
         } else {
-            playerErosionLevel += (currentZoneErosion > 0.0f) ? (currentZoneErosion * 18.0f * deltaTime) : (-4.0f * deltaTime);
+            if (currentZoneErosion > 0.0f) {
+                playerErosionLevel += currentZoneErosion * 18.0f * deltaTime;
+            } else {
+                playerErosionLevel -= 4.0f * deltaTime;
+            }
         }
         if (playerErosionLevel > 100.0f) playerErosionLevel = 100.0f;
         if (playerErosionLevel < 0.0f) playerErosionLevel = 0.0f;

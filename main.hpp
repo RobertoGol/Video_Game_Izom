@@ -2,16 +2,28 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <d3d11.h>
-#include <d3dcompiler.h> // <--- УБЕДИСЬ, ЧТО ЭТА СТРОКА ТУТ ЕСТЬ
+#include <d3dcompiler.h>
 #include <vector>
 #include <string>
+#include <algorithm>
+
 #include "Types.hpp"
 #include "Tactics.hpp"
 
-// ГЛОБАЛЬНЫЙ СТЭЙТ ИГРОКА И МИРА
+// ИСПРАВЛЕНО: Все инклуды модулей подключаются СТРОГО здесь
+#include "Enemies.hpp"
+#include "Mechanics.hpp"
+#include "Player.hpp"
+
+// Forward declarations системных функций
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+void UpdateHelldiversCamera(float deltaTime);
+
+// ОБЪЯВЛЕНИЕ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ (extern для линкера)
 extern UnitMode playerMode;
 extern Vector3D playerPos;
 extern float playerHealth;
@@ -35,6 +47,7 @@ extern TitanAlly titan;
 extern Vector3D towerPosition;
 extern float playerErosionLevel;
 extern bool isAiming;
+extern float baseZoom;
 
 // DIRECTX 11 СИСТЕМНЫЕ УКАЗАТЕЛИ
 extern ID3D11Device*           g_pd3dDevice;
