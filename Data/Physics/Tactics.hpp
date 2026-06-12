@@ -1,16 +1,15 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "../Types.hpp"
 
-// Структура для хранения физических параметров Крюка-кошки
 struct GrapplePhysics {
     bool isAttached = false;
     Vector3D hookPoint;
     float length = 0.0f;
-    Vector3D velocity; // Внутренний вектор импульса полета
+    Vector3D velocity; 
 };
 
-// Структура для Оборонительной стены Э-ДАНЬ (A-Wall)
 struct DeployableShield {
     bool isDeployed = false;
     Vector3D position;
@@ -18,7 +17,6 @@ struct DeployableShield {
     float lifetime = 5.0f;
 };
 
-// Расширенный класс менеджера тактик из лора GMyGameDoNotTouch
 class Vault17ClassManager {
 private:
     PilotClass activePilotClass;
@@ -31,12 +29,15 @@ public:
     float tacticalActiveTimer;
     bool isTacticalActive;
 
-    // Специфические объекты физики тактик
+    // Внутренние параметры каноничных тактик Titanfall 2
     GrapplePhysics grapple;
     DeployableShield aWallShield;
     Vector3D pulseBladePos;
     float pulseBladeRadius;
     bool isPulseBladeActive;
+    
+    // Стейт Фазового сдвига (Titanfall 2 канон)
+    bool isPhaseDimensionActive; 
 
     Vault17ClassManager();
 
@@ -53,11 +54,9 @@ public:
     void UpdateActiveStats();
     std::wstring GetActiveClassNameW() const;
     
-    // Внутренние физические процессоры умений
     void ProcessGrapplePhysics(Vector3D& pilotPos, float deltaTime);
 };
 
-// Класс изометрической камеры
 class IsometricCamera {
 public:
     const float ISO_COS = 0.8660254f; 

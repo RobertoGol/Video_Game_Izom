@@ -365,7 +365,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         // ФАЗА РЕНДЕРИНГА DIRECTX 11
         const float clear_color[] = { 0.05f, 0.05f, 0.06f, 1.0f };
         g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
-        g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color);
+        // ФАЗА РЕНДЕРИНГА DIRECTX 11
+        // ТИТАНФОЛЛ 2 КАНОН: Если пилот ушел в Фазовый Сдвиг, экран обесцвечивается в серые тона изнанки измерения
+        float phase_color[] = { 0.18f, 0.19f, 0.22f, 1.0f };
+        float normal_color[] = { 0.05f, 0.05f, 0.06f, 1.0f };
+        
+        const float* current_clear_color = (gameClasses.isPhaseDimensionActive) ? phase_color : normal_color;
+        
+        g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+        g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, current_clear_color);
 
         D3D11_VIEWPORT vp = { 0.0f, 0.0f, width, height, 0.0f, 1.0f };
         g_pd3dDeviceContext->RSSetViewports(1, &vp);
