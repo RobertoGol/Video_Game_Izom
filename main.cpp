@@ -1,131 +1,38 @@
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <d3d11.h>
-#include <d3dcompiler.h>
-#include <iostream>
-#include <vector>
-#include <cmath>
-#include <algorithm>
+#include "main.hpp"
 
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d3dcompiler.lib")
+// ИНИЦИАЛИЗАЦИЯ ВСЕХ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ
+UnitMode playerMode = UnitMode::Scout;
+Vector3D playerPos = { 5.0f, 5.0f, 0.0f };
+float playerHealth = 100.0f;
+float playerMaxHealth = 100.0f;
+float playerSpeed = 5.5f;
+float fireCooldown = 0.0f;
 
-// ============================================================================
-// 1. ОПЕРЕЖАЮЩИЕ ОБЪЯВЛЕНИЯ (ФИКС ОШИБКИ ИДЕНТИФИКАТОРОВ)
-// ============================================================================
-// --- ОБЯЗАТЕЛЬНЫЕ ПРЕДВАРИТЕЛЬНЫЕ ОБЪЯВЛЕНИЯ ФУНКЦИЙ ---
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-bool CheckWorldCollision(float nextX, float nextY, float radius);
-void UpdateHelldiversCamera(float deltaTime);
-// ============================================================================
-// 2. МАТЕМАТИЧЕСКИЕ И ИГРОВЫЕ СТРУКТУРЫ
-// ============================================================================
-struct Vector3D { 
-    float x = 0.0f; 
-    float y = 0.0f; 
-    float z = 0.0f; 
-};
+Vector3D cameraTarget = { 5.0f, 5.0f, 0.0f };
+IsometricCamera isoCamera;
+Vector3D mouseWorldPos;
+ScreenPoint currentMouseScreenPos;
 
-struct ScreenPoint { 
-    float x = 0.0f; 
-    float y = 0.0f; 
-};
+std::vector<Bullet> bullets;
+std::vector<Enemy> enemies;
+float enemySpawnTimer = 0.0f;
+int score = 0;
 
-enum class UnitMode { Scout, Titan };
-enum class AIState { Follow, Guard, Combat };
+Vault17ClassManager gameClasses;
+Vault17GridState regionalGrid;
+Vector3D towerPosition = { 10.0f, 10.0f, 0.0f };
+float playerErosionLevel = 0.0f;
+bool isAiming = false;
 
-struct Bullet {
-    Vector3D start; 
-    Vector3D current; 
-    Vector3D direction;
-    float speed = 28.0f; 
-    float distanceTraveled = 0.0f; 
-    float maxDistance = 16.0f; 
-    bool isAlive = true;
-};
+ID3D11Device*           g_pd3dDevice = nullptr;
+ID3D11DeviceContext*    g_pd3dDeviceContext = nullptr;
+IDXGISwapChain*         g_pSwapChain = nullptr;
+ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
+ID3D11VertexShader*     g_pVertexShader = nullptr;
+ID3D11PixelShader*      g_pPixelShader = nullptr;
+ID3D11InputLayout*      g_pInputLayout = nullptr;
+ID3D11Buffer*           g_pVertexBuffer = nullptr;
 
-struct Enemy {
-    Vector3D position; 
-    float health = 35.0f; 
-    float speed = 2.4f; 
-    bool isAlive = true; 
-    float radius = 0.35f; // Радиус хитбокса Вермина (в метрах) - Вермины
-};
-
-struct Vertex {
-    float x, y, z;
-    float r, g, b, a;
-};
-
-// Компоненты Меха BT-72 из оригинального лора реставрации
-struct TitanComponents {
-    float coreEnergy = 100.0f;       
-    float chassisIntegrity = 100.0f; 
-    float turretStatus = 100.0f;     
-    float sensorLink = 100.0f;       
-};
-
-struct TitanAlly {
-    Vector3D position = { 2.0f, 2.0f, 0.0f };
-    float health = 600.0f;
-    float maxHealth = 600.0f;
-    float speed = 3.2f;
-    float fireCooldown = 0.0f;
-    bool isPiloted = false;               
-    AIState aiState = AIState::Follow;    
-    TitanComponents systems;              
-};
-
-// Состояние региональной сети из файлов нормализации (NormalizeWorldFieldState)
-struct Vault17GridState {
-    bool towerSyncRecovered = true;   
-    bool localRelayAvailable = true;  
-    bool feyRingGateUnlocked = true;  
-    float towerHealth = 200.0f;       
-};
-
-// Счетчики пробуждения пассивных перков из оригинального файла SkillSystem.cpp
-struct SkillAwakening {
-    int footKills = 0;                
-    int archiveSyncs = 0;             
-    int tankActions = 0;              
-    bool fieldReflexAwakened = false;
-    bool pilotSyncAwakened = false;
-};
-
-// 2. ИЗОМЕТРИЧЕСКАЯ КАМЕРА
-class IsometricCamera {
-public:
-    const float ISO_COS = 0.8660254f;
-    const float ISO_SIN = 0.5000000f;
-    float zoom = 55.0f; 
-    ScreenPoint centerOffset = { 640.0f, 360.0f };
-
-    ScreenPoint WorldToScreen(const Vector3D& worldPos, const Vector3D& cameraTarget) const {
-        float relX = worldPos.x - cameraTarget.x;
-        float relY = worldPos.y - cameraTarget.y;
-        float relZ = worldPos.z - cameraTarget.z;
-        ScreenPoint screen;
-        screen.x = (relX - relY) * ISO_COS;
-        screen.y = (relX + relY) * ISO_SIN - relZ;
-        screen.x = (screen.x * zoom) + centerOffset.x;
-        screen.y = (screen.y * zoom) + centerOffset.y;
-        return screen;
-    }
-
-    Vector3D ScreenToWorldGround(const ScreenPoint& screenPos, const Vector3D& cameraTarget) const {
-        float sx = (screenPos.x - centerOffset.x) / zoom;
-        float sy = (screenPos.y - centerOffset.y) / zoom;
-        Vector3D world;
-        world.x = (sx / (2.0f * ISO_COS)) + (sy / (2.0f * ISO_SIN)) + cameraTarget.x;
-        world.y = (sy / (2.0f * ISO_SIN)) - (sx / (2.0f * ISO_COS)) + cameraTarget.y;
-        world.z = 0.0f;
-        return world;
-    }
-};
-
-// ГЛОБАЛЬНЫЙ СТЭЙТ ИГРЫ И ПОДПИСАННЫЕ МАССИВЫ КАРТ
 int currentSectorMap[MAP_WIDTH][MAP_HEIGHT] = {
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
     {1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1},
@@ -148,75 +55,29 @@ int currentSectorMap[MAP_WIDTH][MAP_HEIGHT] = {
     {1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1},
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
-
 int wallDurability[MAP_WIDTH][MAP_HEIGHT];
 float etherErosionMap[MAP_WIDTH][MAP_HEIGHT];
 
-UnitMode playerMode = UnitMode::Scout;
-Vector3D playerPos = { 5.0f, 5.0f, 0.0f };
-float playerHealth = 100.0f;
-float playerMaxHealth = 100.0f;
-float playerSpeed = 5.5f;
-float fireCooldown = 0.0f;
-float playerErosionLevel = 0.0f;         
-const float EROSION_DAMAGE_THRESHOLD = 50.0f; 
-
-Vector3D cameraTarget = { 0.0f, 0.0f, 0.0f };
-IsometricCamera isoCamera;
-Vector3D mouseWorldPos;
-ScreenPoint currentMouseScreenPos;
-
-std::vector<Bullet> bullets;
-std::vector<Enemy> enemies;
-float enemySpawnTimer = 0.0f;
-int score = 0;
-
-TitanAlly titan;
-Vault17GridState regionalGrid;
-SkillAwakening skillCounters;
-Vector3D towerPosition = { 10.0f, 10.0f, 0.0f }; 
-
-// ГЛОБАЛЬНЫЕ ОБЪЕКТЫ DIRECTX 11
-ID3D11Device*           g_pd3dDevice = nullptr;
-ID3D11DeviceContext*    g_pd3dDeviceContext = nullptr;
-IDXGISwapChain*         g_pSwapChain = nullptr;
-ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
-
-ID3D11VertexShader*     g_pVertexShader = nullptr;
-ID3D11PixelShader*      g_pPixelShader = nullptr;
-ID3D11InputLayout*      g_pInputLayout = nullptr;
-ID3D11Buffer*           g_pVertexBuffer = nullptr;
-
-// HLSL ШЕЙДЕРЫ КОНВЕЙЕРА РЕНДЕРИНГА
 const char* vertexShaderSrc = R"(
 struct VS_INPUT { float3 pos : POSITION; float4 col : COLOR; };
 struct PS_INPUT { float4 pos : SV_POSITION; float4 col : COLOR; };
 PS_INPUT main(VS_INPUT input) {
     PS_INPUT output; output.pos = float4(input.pos, 1.0f); output.col = input.col; return output;
-};
-)";
+};)";
 
 const char* pixelShaderSrc = R"(
 struct PS_INPUT { float4 pos : SV_POSITION; float4 col : COLOR; };
-float4 main(PS_INPUT input) : SV_TARGET { return input.col; };
-)";
+float4 main(PS_INPUT input) : SV_TARGET { return input.col; };)";
 
-// 3. ФУНКЦИИ ЛОГИКИ И ПРОВЕРКИ СТОЛКНОВЕНИЙ
 bool CheckWorldCollision(float nextX, float nextY, float radius) {
     int checkPoints[4][2] = {
         { (int)(nextX - radius), (int)(nextY - radius) },
         { (int)(nextX + radius), (int)(nextY - radius) },
         { (int)(nextX - radius), (int)(nextY + radius) },
         { (int)(nextX + radius), (int)(nextY + radius) }
-    float checkPoints[4][2] = {
-        { nextX - radius, nextY - radius },
-        { nextX + radius, nextY - radius },
-        { nextX - radius, nextY + radius },
-        { nextX + radius, nextY + radius }
     };
     for (int i = 0; i < 4; ++i) {
-        int tx = (int)checkPoints[i][0];
-        int ty = (int)checkPoints[i][1];
+        int tx = checkPoints[i][0]; int ty = checkPoints[i][1];
         if (tx < 0 || tx >= MAP_WIDTH || ty < 0 || ty >= MAP_HEIGHT) return true;
         if (currentSectorMap[tx][ty] == 1) return true;
     }
@@ -237,49 +98,9 @@ void UpdateHelldiversCamera(float deltaTime) {
     cameraTarget.y += (targetY - cameraTarget.y) * 4.5f * deltaTime;
 }
 
-void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
-    Vector3D moveDir = { 0.0f, 0.0f, 0.0f };
-    if (GetAsyncKeyState('W') & 0x8000) { moveDir.x += 1.0f; moveDir.y -= 1.0f; }
-    if (GetAsyncKeyState('S') & 0x8000) { moveDir.x -= 1.0f; moveDir.y += 1.0f; }
-    if (GetAsyncKeyState('A') & 0x8000) { moveDir.x -= 1.0f; moveDir.y -= 1.0f; }
-    if (GetAsyncKeyState('D') & 0x8000) { moveDir.x += 1.0f; moveDir.y += 1.0f; }
-
-    float len = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
-    if (len > 0.0f) {
-        float nextX = playerPos.x + (moveDir.x / len) * playerSpeed * deltaTime;
-        float nextY = playerPos.y + (moveDir.y / len) * playerSpeed * deltaTime;
-        float playerRadius = (playerMode == UnitMode::Titan) ? 0.55f : 0.25f;
-        if (!CheckWorldCollision(nextX, playerPos.y, playerRadius)) playerPos.x = nextX;
-        if (!CheckWorldCollision(playerPos.x, nextY, playerRadius)) playerPos.y = nextY;
-    }
-
-    POINT mp; GetCursorPos(&mp); ScreenToClient(hwnd, &mp);
-    currentMouseScreenPos = { (float)mp.x, (float)mp.y };
-    mouseWorldPos = isoCamera.ScreenToWorldGround(currentMouseScreenPos, cameraTarget);
-
-    if (fireCooldown > 0.0f) fireCooldown -= deltaTime;
-
-    if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) && fireCooldown <= 0.0f) {
-        Bullet b; b.start = playerPos; b.current = playerPos;
-        float dx = mouseWorldPos.x - playerPos.x; float dy = mouseWorldPos.y - playerPos.y;
-        float dLen = std::sqrt(dx * dx + dy * dy);
-        if (dLen > 0.05f) {
-            b.direction = { dx / dLen, dy / dLen, 0.0f };
-            bullets.push_back(b);
-            fireCooldown = (playerMode == UnitMode::Titan) ? 0.08f : 0.25f;
-        }
-    }
-}
-
-// ============================================================================
-// 7. СИСТЕМНЫЕ ФУНКЦИИ DIRECTX 11
-// ============================================================================
-// 4. ОКОННЫЕ СИСТЕМНЫЕ ФУНКЦИИ WIN32 / DIRECTX 11
 void CreateRenderTarget() {
     ID3D11Texture2D* pBackBuffer;
     g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    ID3D11Texture2D* pBackBuffer = nullptr;
-    g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
     g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
     pBackBuffer->Release();
 }
@@ -298,61 +119,62 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             return 0;
         case WM_SYSCOMMAND:
-            if ((wParam & 0xFFF0) == SC_KEYMENU) return 0; // Блокируем вызов системного меню по ALT
+            if ((wParam & 0xFFF0) == SC_KEYMENU) return 0;
             break;
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
-                case WM_KEYDOWN:
+        case WM_MOUSEWHEEL:
+            if (playerMode == UnitMode::Titan && (GetAsyncKeyState(VK_RBUTTON) & 0x8000)) {
+                short zDelta = (short)HIWORD(wParam);
+                if (zDelta > 0) isoCamera.zoom += 4.0f; else isoCamera.zoom -= 4.0f;
+                if (isoCamera.zoom < 30.0f) isoCamera.zoom = 30.0f;
+                if (isoCamera.zoom > 90.0f) isoCamera.zoom = 90.0f;
+            }
+            return 0;
+        case WM_KEYDOWN:
             if (wParam == 'E') {
                 if (!titan.isPiloted) {
-                    // Рассчитываем дистанцию между Скаутом и Мехом для инициализации Sync Link
-                    float dx = playerPos.x - titan.position.x;
-                    float dy = playerPos.y - titan.position.y;
-                    float distToTitan = std::sqrt(dx * dx + dy * dy);
-
-                    // Сесть внутрь кабины BT-72 можно только находясь вплотную (радиус 1.8 метра)
-                    // Инициализация Sync Link с BT-72 на дистанции до 1.8 метров
-                    if (distToTitan <= 1.8f) {
-                        titan.isPiloted = true;
-                        playerMode = UnitMode::Titan;
-                        playerMaxHealth = titan.maxHealth;
-                        playerHealth = titan.health;
-                        playerSpeed = titan.speed; // Скорость падает под весом шасси
-                        
-                        // Инкрементируем счетчик синхронизации из SkillSystem.cpp
-                        // Сесть внутрь кабины BT-72 можно только находясь вплотную (радиус 1.8 метра)
-                        skillCounters.tankActions++;
+                    float dx = playerPos.x - titan.position.x; float dy = playerPos.y - titan.position.y;
+                    if (std::sqrt(dx*dx + dy*dy) <= 1.8f) {
+                        titan.isPiloted = true; gameClasses.EnterVehicle();
+                        playerMode = UnitMode::Titan; playerMaxHealth = gameClasses.currentStats.maxHealth;
+                        playerHealth = titan.health; playerSpeed = gameClasses.currentStats.moveSpeed;
                     }
                 } else {
-                    // Высадка пилота обратно на карту секторов
-                    // Обратная высадка Скаута на карту секторов
-                    titan.isPiloted = false;
-                    // Высадка пилота обратно на карту секторов
-                    titan.health = playerHealth; // Сохраняем ХП меха при выходе
-                    playerMode = UnitMode::Scout;
-                    playerMaxHealth = 100.0f;
-                    playerHealth = 100.0f; // Восстанавливаем статы Скаута
-                    playerSpeed = 6.5f;
+                    titan.isPiloted = false; titan.health = playerHealth; gameClasses.ExitVehicle();
+                    playerMode = UnitMode::Scout; playerMaxHealth = gameClasses.currentStats.maxHealth;
+                    playerHealth = 100.0f; playerSpeed = gameClasses.currentStats.moveSpeed;
                     playerPos.x = titan.position.x + 1.0f;
-                    playerPos.y = titan.position.y;
                 }
+            }
+            if (wParam == VK_TAB && titan.isPiloted) {
+                titan.currentWeapon = (titan.currentWeapon == TankWeaponMode::Cannon) ? TankWeaponMode::AutoCannon : TankWeaponMode::Cannon;
+            }
+            if (wParam == 'Q') gameClasses.ActivateTacticalSkill();
+            if (!titan.isPiloted) {
+                if (wParam == '1') gameClasses.ChangePilotClass(PilotClass::Grapple);
+                if (wParam == '2') gameClasses.ChangePilotClass(PilotClass::Cloak);
+                if (wParam == '3') gameClasses.ChangePilotClass(PilotClass::Stream);
+            }
+            if (titan.isPiloted) {
+                if (wParam == '4') gameClasses.ChangeTitanFirmware(TitanClass::Ion);
+                if (wParam == '5') gameClasses.ChangeTitanFirmware(TitanClass::Scorch);
+                if (wParam == '6') gameClasses.ChangeTitanFirmware(TitanClass::Northstar);
+                if (wParam == '7') gameClasses.ChangeTitanFirmware(TitanClass::Tone);
             }
             break;
     }
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
-// Вспомогательная функция перевода экранных пикселей в нормализованные координаты DX11 NDC (-1.0 до 1.0)
 ScreenPoint PixelsToNDC(float x, float y, float width, float height) {
     return { (x / width) * 2.0f - 1.0f, (1.0f - (y / height) * 2.0f) };
 }
 
-// Генерация радиальных примитивов/полигонов в буфер вершин
-void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments = 12) {
+void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments) {
     for (int i = 0; i < segments; ++i) {
-        float a1 = (i / (float)segments) * 6.283185f;
-        float a2 = ((i + 1) / (float)segments) * 6.283185f;
+        float a1 = (i / (float)segments) * 6.283185f; float a2 = ((i + 1) / (float)segments) * 6.283185f;
         ScreenPoint p0 = PixelsToNDC(cx, cy, width, height);
         ScreenPoint p1 = PixelsToNDC(cx + std::cos(a1) * r, cy + std::sin(a1) * r, width, height);
         ScreenPoint p2 = PixelsToNDC(cx + std::cos(a2) * r, cy + std::sin(a2) * r, width, height);
@@ -362,7 +184,6 @@ void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float 
     }
 }
 
-// Тактический Win32-ввод в реальном времени с расчетом скольжения вдоль стен секторов
 void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     Vector3D moveDir = { 0.0f, 0.0f, 0.0f };
     if (GetAsyncKeyState('W') & 0x8000) { moveDir.x += 1.0f; moveDir.y -= 1.0f; }
@@ -370,58 +191,128 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     if (GetAsyncKeyState('A') & 0x8000) { moveDir.x -= 1.0f; moveDir.y -= 1.0f; }
     if (GetAsyncKeyState('D') & 0x8000) { moveDir.x += 1.0f; moveDir.y += 1.0f; }
 
+    isAiming = (GetAsyncKeyState(VK_RBUTTON) & 0x8000);
+    if (playerMode == UnitMode::Scout || !isAiming) {
+        isoCamera.zoom += (baseZoom - isoCamera.zoom) * 5.0f * deltaTime;
+    }
+
     float len = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
     if (len > 0.0f) {
-        float nextX = playerPos.x + (moveDir.x / len) * playerSpeed * deltaTime;
-        float nextY = playerPos.y + (moveDir.y / len) * playerSpeed * deltaTime;
-        
-        // Радиус физической коллизии: Скаут — 0.25м, Мех BT-72 — 0.55м
+        float currentMoveSpeed = playerSpeed;
+        if (playerMode == UnitMode::Scout && isAiming) currentMoveSpeed *= 0.63f;
+        if (playerMode == UnitMode::Titan && titan.systems.tracksCondition < 40.0f) currentMoveSpeed *= 0.3f;
+
+        float nextX = playerPos.x + (moveDir.x / len) * currentMoveSpeed * deltaTime;
+        float nextY = playerPos.y + (moveDir.y / len) * currentMoveSpeed * deltaTime;
         float playerRadius = (playerMode == UnitMode::Titan) ? 0.55f : 0.25f;
 
-        // Поочередная проверка осей гарантирует плавное скольжение без залипания в углах
         if (!CheckWorldCollision(nextX, playerPos.y, playerRadius)) playerPos.x = nextX;
         if (!CheckWorldCollision(playerPos.x, nextY, playerRadius)) playerPos.y = nextY;
     }
 
-    // Расчет прицела Pip-Pad через обратную изометрическую проекцию
-    POINT mp; 
-    GetCursorPos(&mp); 
-    ScreenToClient(hwnd, &mp);
     POINT mp; GetCursorPos(&mp); ScreenToClient(hwnd, &mp);
     currentMouseScreenPos = { (float)mp.x, (float)mp.y };
     mouseWorldPos = isoCamera.ScreenToWorldGround(currentMouseScreenPos, cameraTarget);
 
     if (fireCooldown > 0.0f) fireCooldown -= deltaTime;
 
-    // Ведение реального огня по зажатию ЛКМ Windows
-    if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) && fireCooldown <= 0.0f) {
-        Bullet b; 
-        b.start = playerPos; 
-        b.current = playerPos;
-        float dx = mouseWorldPos.x - playerPos.x; 
-        float dy = mouseWorldPos.y - playerPos.y;
-        float dLen = std::sqrt(dx * dx + dy * dy);
-        
-        Bullet blt; blt.start = playerPos; blt.current = playerPos;
-        float dx = mouseWorldPos.x - playerPos.x; float dy = mouseWorldPos.y - playerPos.y;
-        float dLen = std::sqrt(dx*dx + dy*dy);
-        if (dLen > 0.05f) {
-            b.direction = { dx / dLen, dy / dLen, 0.0f };
-            bullets.push_back(b);
-            // Автоматическая пушка BT-72 стреляет очередью, винтовка Скаута — одиночными
-            fireCooldown = (playerMode == UnitMode::Titan) ? 0.08f : 0.25f;
+    // Расчет вектора направления наведения на цель
+    float dx = mouseWorldPos.x - playerPos.x;
+    float dy = mouseWorldPos.y - playerPos.y;
+    float dLen = std::sqrt(dx * dx + dy * dy);
+
+    if (dLen > 0.05f && fireCooldown <= 0.0f) {
+        Vector3D normDir = { dx / dLen, dy / dLen, 0.0f };
+
+        // --------------------------------------------------------------------
+        // ОГНЕВЫЕ РЕЖИМЫ КЛАССА: СКАУТ-ОПЕРАТИВНИК
+        // --------------------------------------------------------------------
+        if (playerMode == UnitMode::Scout) {
+            // ЛКМ: Одиночный точный карабин или Дробовик кучным пучком (Если нажат ПКМ)
+            if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
+                if (isAiming) {
+                    // Режим Дробовика: Вылетает 5 дробин кучным пучком строго в одном направлении
+                    float pelletSpread = 0.04f; 
+                    for (int i = 0; i < 5; ++i) {
+                        Bullet p; p.start = playerPos; p.current = playerPos; p.type = BulletType::Pellet;
+                        float randomSpread = ((rand() % 100) / 100.0f - 0.5f) * pelletSpread;
+                        p.direction = { normDir.x + randomSpread, normDir.y + randomSpread, 0.0f };
+                        bullets.push_back(p);
+                    }
+                    fireCooldown = 0.55f;
+                } else {
+                    // Режим Карабина: Одиночный точный выстрел
+                    Bullet b; b.start = playerPos; b.current = playerPos; b.direction = normDir;
+                    b.type = BulletType::Standard; bullets.push_back(b);
+                    fireCooldown = 0.22f;
+                }
+            }
+        }
+        // --------------------------------------------------------------------
+        // ОГНЕВЫЕ РЕЖИМЫ КЛАССА: УПРАВЛЯЕМЫЙ ТАНК С ИИ
+        // --------------------------------------------------------------------
+        else if (playerMode == UnitMode::Titan) {
+            // Если Вермины повредили турель Танка — разброс пушки резко возрастает
+            if (titan.systems.turretStatus < 50.0f) {
+                float brokenFactor = ((rand() % 100) / 100.0f - 0.5f) * 0.25f;
+                normDir.x += brokenFactor; normDir.y += brokenFactor;
+            }
+
+            // Нажатие на СКМ циклически меняет режим залпа ракетного модуля
+            if (GetAsyncKeyState(VK_MBUTTON) & 0x8000) {
+                if (titan.hasMissileModule) {
+                    if (titan.missileMode == MissileStrikeMode::Ballistic) {
+                        // Режим 1: Залп из 7-8 ракет горизонтальной баллистической стеной
+                        for (int i = -3; i <= 3; ++i) {
+                            Bullet m; m.start = playerPos; m.current = playerPos;
+                            m.type = BulletType::BallisticMissile; m.speed = 15.0f; m.splashRadius = 1.8f;
+                            Vector3D sideVector = { -normDir.y, normDir.x, 0.0f };
+                            m.start.x += sideVector.x * (i * 0.4f);
+                            m.start.y += sideVector.y * (i * 0.4f);
+                            m.direction = normDir;
+                            bullets.push_back(m);
+                        }
+                    } else {
+                        // Режим 2: Артиллерийский залп из 8 ракет по навесной траектории вверх
+                        for (int i = 0; i < 8; ++i) {
+                            Bullet m; m.start = playerPos; m.current = playerPos;
+                            m.type = BulletType::ArtilleryMissile; m.speed = 10.0f; m.splashRadius = 2.4f;
+                            m.targetPos = mouseWorldPos; 
+                            m.targetPos.x += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+                            m.targetPos.y += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+                            bullets.push_back(m);
+                        }
+                    }
+                    // Переключаем режим на СКМ
+                    titan.missileMode = (titan.missileMode == MissileStrikeMode::Ballistic) ? MissileStrikeMode::Artillery : MissileStrikeMode::Ballistic;
+                    fireCooldown = 1.8f; 
+                }
+            }
+
+            // Нажатие ЛКМ активирует выбранный на Tab ствол Танка
+            if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
+                if (titan.currentWeapon == TankWeaponMode::Cannon) {
+                    // Режим 1: Одиночный залп пушки
+                    Bullet b; b.start = playerPos; b.current = playerPos; b.direction = normDir;
+                    b.type = BulletType::Standard; b.speed = 25.0f; bullets.push_back(b);
+                    fireCooldown = 0.4f;
+                } else {
+                    // Режим 2: Скорострельная автоматическая пушка-автомат
+                    Bullet b; b.start = playerPos; b.current = playerPos; b.direction = normDir;
+                    b.type = BulletType::Standard; b.speed = 34.0f; bullets.push_back(b);
+                    fireCooldown = (titan.systems.turretStatus < 50.0f) ? 0.18f : 0.07f;
+                }
+            }
         }
     }
 }
 
 // Нативная точка входа приложения Windows
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    // Регистрация класса окна
     WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, hInstance, nullptr, nullptr, nullptr, nullptr, L"PureIsoDX11", nullptr };
     RegisterClassExW(&wc);
-    HWND hwnd = CreateWindowW(L"PureIsoDX11", L"Vault 17 Outpost - Pure DirectX 11 Engine", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 720, nullptr, nullptr, hInstance, nullptr);
+    HWND hwnd = CreateWindowW(L"PureIsoDX11", L"Vault 17 Tactical Core - DirectX 11", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 720, nullptr, nullptr, hInstance, nullptr);
 
-    // Конфигурация SwapChain под DirectX 11
     DXGI_SWAP_CHAIN_DESC sd = {};
     sd.BufferCount = 1; 
     sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -431,18 +322,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     sd.OutputWindow = hwnd;
     sd.SampleDesc.Count = 1; 
     sd.Windowed = TRUE;
-    sd.BufferCount = 1; sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60; sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; sd.OutputWindow = hwnd;
-    sd.SampleDesc.Count = 1; sd.Windowed = TRUE;
 
-    // Аппаратная инициализация графического конвейера
     D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, nullptr, &g_pd3dDeviceContext);
     CreateRenderTarget();
 
-    // Компиляция встроенного шейдерного кода HLSL "на лету"
-    ID3DBlob* vsBlob = nullptr; 
-    ID3DBlob* psBlob = nullptr;
     ID3DBlob* vsBlob = nullptr; ID3DBlob* psBlob = nullptr;
     D3DCompile(vertexShaderSrc, strlen(vertexShaderSrc), nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vsBlob, nullptr);
     D3DCompile(pixelShaderSrc, strlen(pixelShaderSrc), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0, &psBlob, nullptr);
@@ -450,62 +333,39 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     g_pd3dDevice->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &g_pVertexShader);
     g_pd3dDevice->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &g_pPixelShader);
 
-    // Описание структуры вершинного формата (Позиция + Цвет)
     D3D11_INPUT_ELEMENT_DESC layout[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
     g_pd3dDevice->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &g_pInputLayout);
-    vsBlob->Release(); 
-    psBlob->Release();
     vsBlob->Release(); psBlob->Release();
 
-    // Выделение динамического буфера под геометрию реального времени (До 30 000 вершин на кадр)
-    D3D11_BUFFER_DESC bd = {}; 
-    bd.Usage = D3D11_USAGE_DYNAMIC; 
-    bd.ByteWidth = sizeof(Vertex) * 30000;
-    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER; 
-    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     D3D11_BUFFER_DESC bd = {}; bd.Usage = D3D11_USAGE_DYNAMIC; bd.ByteWidth = sizeof(Vertex) * 30000;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER; bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     g_pd3dDevice->CreateBuffer(&bd, nullptr, &g_pVertexBuffer);
 
-    // ============================================================================
-    // ВСТАВКА 2: ЗАПОЛНЕНИЕ КАРТЫ СЕКТОРОВ И АНОМАЛИЙ
-    // ============================================================================
     // Инициализация прочности разрушаемых завалов стен и карты эфирной эрозии
-    // Заполнение карт секторов, прочности завалов и аномалий эрозии
     for (int x = 0; x < MAP_WIDTH; ++x) {
         for (int y = 0; y < MAP_HEIGHT; ++y) {
-             // Если на карте завал (1), даем ему 100 единиц прочности
+            if (currentSectorMap[x][y] == 1) {
                 wallDurability[x][y] = 100;
                 etherErosionMap[x][y] = 0.0f;
             } else {
                 wallDurability[x][y] = 0;
-                // Генерируем случайные пятна эфирной эрозии в проходах бункера
-                // Развертывание аномальных зон в проходах коридоров бункера
                 etherErosionMap[x][y] = ((x % 5 == 0 && y % 4 == 0) ? 0.75f : 0.0f);
             }
         }
     }
-    // Зачищаем стартовую комнату от завалов, чтобы Скаут и Мех не заспавнились в стене
+    
     currentSectorMap[5][5] = 0; wallDurability[5][5] = 0;
     currentSectorMap[6][5] = 0; wallDurability[6][5] = 0;
     playerPos = { 5.0f, 5.0f, 0.0f };
     titan.position = { 6.0f, 5.0f, 0.0f };
 
-        ShowWindow(hwnd, nCmdShow); 
-    UpdateWindow(hwnd);
+    ShowWindow(hwnd, nCmdShow); UpdateWindow(hwnd);
 
-    ShowWindow(hwnd, nCmdShow); 
-    UpdateWindow(hwnd);
-
-    LARGE_INTEGER frequency, t1, t2; 
-    QueryPerformanceFrequency(&frequency); 
-    QueryPerformanceCounter(&t1);
-    
-    bool running = true; 
-    MSG msg;
+    LARGE_INTEGER frequency, t1, t2; QueryPerformanceFrequency(&frequency); QueryPerformanceCounter(&t1);
+    bool running = true; MSG msg;
 
     while (running) {
         while (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
@@ -523,10 +383,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         float height = static_cast<float>(rect.bottom - rect.top);
         isoCamera.centerOffset = { width / 2.0f, height / 2.0f };
 
+        // ТАКТИЧЕСКИЕ ОБНОВЛЕНИЯ КЛАССОВ И ТАЙМЕРОВ КУЛДАУНА СПОСОБНОСТЕЙ
+        gameClasses.UpdateCooldowns(deltaTime);
+        if (!titan.isPiloted) {
+            playerSpeed = gameClasses.currentStats.moveSpeed;
+        }
+
         HandleInput(hwnd, deltaTime, width, height);
         UpdateHelldiversCamera(deltaTime);
 
-        // Генерация роя Верминов (Vermin) за картой
+        // Таймер генерации Vermin за экраном
         enemySpawnTimer += deltaTime;
         if (enemySpawnTimer >= 1.2f) {
             Enemy e; float angle = (rand() % 360) * 0.0174533f;
@@ -535,31 +401,79 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
             enemies.push_back(e); enemySpawnTimer = 0.0f;
         }
 
-        // Обновление баллистики лазерных снарядов и расчистка завалов
+        // Вычисления пуль и баллистических траекторий
         for (auto& b : bullets) {
-            float step = b.speed * deltaTime; b.current.x += b.direction.x * step; b.current.y += b.direction.y * step; b.distanceTraveled += step;
+            float moveStep = b.speed * deltaTime;
+                        if (b.type == BulletType::ArtilleryMissile) {
+                float dx = b.targetPos.x - b.current.x;
+                float dy = b.targetPos.y - b.current.y;
+                float distToTarget = std::sqrt(dx * dx + dy * dy);
+
+                if (distToTarget > 0.2f) {
+                    b.current.x += (dx / distToTarget) * moveStep;
+                    b.current.y += (dy / distToTarget) * moveStep;
+                    b.distanceTraveled += moveStep;
+                    
+                    // Расчет параболы высоты Z на основе прогресса пройденного пути
+                    float totalExpectedDist = 12.0f;
+                    float progress = b.distanceTraveled / totalExpectedDist;
+                    if (progress > 1.0f) progress = 1.0f;
+                    // Пик высоты артиллерийского выстрела — 4 метра вверх по оси Z
+                    b.current.z = std::sin(progress * 3.1415926f) * 4.0f; 
+                } else {
+                    // Достижение целевой точки на земле — детонация по площади
+                    b.isAlive = false;
+                }
+            } else {
+                // Прямой настильный полет (Карабин, Дробовик, Баллистические ракеты)
+                b.current.x += b.direction.x * moveStep;
+                b.current.y += b.direction.y * moveStep;
+                b.distanceTraveled += moveStep;
+            }
+
             if (b.distanceTraveled >= b.maxDistance) b.isAlive = false;
 
-            int mapX = (int)b.current.x; int mapY = (int)b.current.y;
+            // ИНЖЕНЕРНЫЙ ПРОСЧЕТ РАЗРУШАЕМОСТИ ЗАВАЛОВ СТЕН (DEBRIS DESTRUCTION)
+            int mapX = (int)b.current.x; 
+            int mapY = (int)b.current.y;
             if (mapX >= 0 && mapX < MAP_WIDTH && mapY >= 0 && mapY < MAP_HEIGHT) {
                 if (currentSectorMap[mapX][mapY] == 1) {
                     b.isAlive = false;
-                    int damageToWall = (playerMode == UnitMode::Titan || titan.isPiloted) ? 25 : 8;
+                    // Взрыв ракет наносит завалам Убежища тяжелый урон
+                    int damageToWall = (b.type == BulletType::BallisticMissile || b.type == BulletType::ArtilleryMissile) ? 50 : 8;
                     wallDurability[mapX][mapY] -= damageToWall;
-                    if (wallDurability[mapX][mapY] <= 0) { currentSectorMap[mapX][mapY] = 0; score += 50; }
+                    if (wallDurability[mapX][mapY] <= 0) { 
+                        currentSectorMap[mapX][mapY] = 0; // Проход расчищен
+                        score += 50; 
+                    }
                     continue;
                 }
             }
-            
+
+            // Сканирование физических хитбоксов Верминов (Vermin) с учетом сплеш-урона
             for (auto& e : enemies) {
                 if (!e.isAlive) continue;
-                float dx = e.position.x - b.current.x; float dy = e.position.y - b.current.y;
-                if (std::sqrt(dx*dx + dy*dy) <= e.radius) {
-                     e.health -= (playerMode == UnitMode::Titan) ? 30.0f : 16.0f; 
+                float edx = e.position.x - b.current.x; 
+                float edy = e.position.y - b.current.y;
+                
+                if (std::sqrt(edx * edx + edy * edy) <= e.radius) {
                     b.isAlive = false;
-                    if (e.health <= 0.0f) { 
-                        e.isAlive = false; 
-                        score += 150; 
+
+                    if (b.type == BulletType::BallisticMissile || b.type == BulletType::ArtilleryMissile) {
+                        // Осколочный взрыв по площади из ТЗ
+                        for (auto& splashEnemy : enemies) {
+                            if (!splashEnemy.isAlive) continue;
+                            float sdx = splashEnemy.position.x - b.current.x;
+                            float sdy = splashEnemy.position.y - b.current.y;
+                            if (std::sqrt(sdx * sdx + sdy * sdy) <= b.splashRadius) {
+                                splashEnemy.health -= 85.0f;
+                                if (splashEnemy.health <= 0.0f) { splashEnemy.isAlive = false; score += 150; }
+                            }
+                        }
+                    } else {
+                        // Одиночные попадания карабина или дроби
+                        e.health -= (b.type == BulletType::Pellet) ? 14.0f : 20.0f;
+                        if (e.health <= 0.0f) { e.isAlive = false; score += 150; }
                     }
                     break;
                 }
@@ -567,7 +481,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         }
         bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& bulletObj) { return !bulletObj.isAlive; }), bullets.end());
 
-        // Обновление логики ИИ врагов (Вермины), атака игрока или Вышки связи Убежища 17
+        // Обновление логики ИИ врагов (Вермины): атака Вышки реле связи или систем игрока
         for (auto& e : enemies) {
             if (!e.isAlive) continue;
             
@@ -575,36 +489,61 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
             float vy = playerPos.y - e.position.y; 
             float dist = std::sqrt(vx * vx + vy * vy);
 
-            // Рассчитываем дистанцию Вермина до вышки связи региона
+            // Дистанция Вермина до Вышки связи региона
             float tdx = towerPosition.x - e.position.x;
             float tdy = towerPosition.y - e.position.y;
             float distToTower = std::sqrt(tdx * tdx + tdy * tdy);
 
-            // Агро-логика Верминов из лора: если они близко к вышке, они грызут её, иначе преследуют Скаута
+            // Проверяем тактическую маскировку или фазовый сдвиг Скаута
+            bool isPlayerHidden = gameClasses.isTacticalActive && 
+                (gameClasses.GetActivePilotClass() == PilotClass::Cloak || 
+                 gameClasses.GetActivePilotClass() == PilotClass::PhaseShift);
+
+            // Если пилот скрылся в невидимости/фазе — Вермины теряют его из вида и грызут Вышку связи
+            if (isPlayerHidden && !titan.isPiloted) {
+                dist = 999.0f; 
+            }
+
+            // Агро-логика Верминов: приоритет вышки реле, если они в радиусе 4 метров
             if (distToTower < 4.0f && regionalGrid.towerSyncRecovered) {
                 if (distToTower > 0.4f) {
                     e.position.x += (tdx / distToTower) * e.speed * deltaTime;
                     e.position.y += (tdy / distToTower) * e.speed * deltaTime;
                 } else {
-                    // Нанесение урона инфраструктуре Убежища 17
+                    // Вермины наносят урон инфраструктуре Убежища 17
                     regionalGrid.towerHealth -= 15.0f * deltaTime;
                     
-                    // Каскадная нормализация состояний (NormalizeWorldFieldState)
+                    // Каскадная нормализация состояний (NormalizeWorldFieldState) из лора
                     if (regionalGrid.towerHealth <= 0.0f) {
                         regionalGrid.towerHealth = 0.0f;
-                        regionalGrid.towerSyncRecovered = false;  // Вышка уничтожена!
+                        regionalGrid.towerSyncRecovered = false;  // Вышка связи уничтожена!
                         regionalGrid.localRelayAvailable = false; // Локальное реле Pip-Pad падает
                         regionalGrid.feyRingGateUnlocked = false; // Врата эвакуации FeyRing блокируются
                     }
                 }
             } else {
-                // Преследование пилота или Меха
+                // Преследование пилота или Танка с ИИ
                 if (dist > 0.35f) {
-                    e.position.x += (vx / dist) * e.speed * deltaTime; 
+                    e.position.x += (vx / dist) * e.speed * deltaTime;
                     e.position.y += (vy / dist) * e.speed * deltaTime;
                 } else {
-                    // Контактный укус
-                    playerHealth -= (playerMode == UnitMode::Titan) ? 8.0f * deltaTime : 25.0f * deltaTime;
+                    // Распределение повреждений по 4 внутренним узлам Танка
+                    if (playerMode == UnitMode::Titan) {
+                        int targetComponent = rand() % 4;
+                        float damageAmt = 15.0f * deltaTime;
+                        
+                        if (targetComponent == 0) titan.systems.tracksCondition -= damageAmt; // Поломка ходовой
+                        else if (targetComponent == 1) titan.systems.turretStatus -= damageAmt;   // Поломка турели пушки
+                        else if (targetComponent == 2) titan.systems.sensorLink -= damageAmt;     // Вывод из строя реле
+                        else titan.systems.coreEnergy -= damageAmt;                               // Повреждение ядра
+                        
+                        // Каскадный пересчет общего здоровья Танка на основе износа узлов
+                        playerHealth = (titan.systems.coreEnergy + titan.systems.tracksCondition + titan.systems.turretStatus + titan.systems.sensorLink) * 1.5f;
+                        if (titan.systems.coreEnergy <= 0.0f) playerHealth = 0.0f; // Взрыв ядра Танка
+                    } else {
+                        // Обычный укус Скаута вне брони Танка
+                        playerHealth -= 25.0f * deltaTime;
+                    }
                     if (playerHealth < 0.0f) playerHealth = 0.0f;
                 }
             }
@@ -612,14 +551,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [](const Enemy& enemyObj) { return !enemyObj.isAlive; }), enemies.end());
 
         // --------------------------------------------------------------------
-        // ПОТОК ЛОГИКИ АВТОНОМНОГО СОЮЗНИКА BT-72 И СКАНИРОВАНИЯ PIP-PAD
+        // ПОТОК ЛОГИКИ АВТОНОМНОГО СОЮЗНИКА (ТАНК С ИИ) И СКАНИРОВАНИЯ PIP-PAD
         // --------------------------------------------------------------------
         if (!titan.isPiloted) {
             float tdx = playerPos.x - titan.position.x;
             float tdy = playerPos.y - titan.position.y;
             float distToPlayer = std::sqrt(tdx * tdx + tdy * tdy);
 
-            // ИИ Меха выбирает приоритетную цель — ближайшего к нему Вермина (Vermin)
+            // ИИ Танка ищет ближайшего к нему Вермина
             Enemy* closestTarget = nullptr;
             float closestDist = 8.0f;
 
@@ -634,7 +573,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
                 }
             }
 
-            // Ведение прикрывающего огня автопушкой ИИ по Вермину
+            // Ведение автоматического прикрывающего огня Танком по Вермину
             if (closestTarget != nullptr) {
                 if (titan.fireCooldown <= 0.0f) {
                     Bullet tb;
@@ -653,7 +592,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
             if (titan.fireCooldown > 0.0f) titan.fireCooldown -= deltaTime;
 
-            // ИИ-следование за Скаутом по коридорам Убежища 17
+// ИИ-движение Танка за Скаутом по свободным проходам
             if (distToPlayer > 2.2f) {
                 float nextX = titan.position.x + (tdx / distToPlayer) * titan.speed * deltaTime;
                 float nextY = titan.position.y + (tdy / distToPlayer) * titan.speed * deltaTime;
@@ -670,9 +609,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
         if (currentTileX >= 0 && currentTileX < MAP_WIDTH && currentTileY >= 0 && currentTileY < MAP_HEIGHT) {
             float currentZoneErosion = etherErosionMap[currentTileX][currentTileY];
-            
+
             if (titan.isPiloted) {
-                // Защита гермокабины BT-72 экранирует пилота от внешнего излучения
+                // Защита тяжелой брони Танка экранирует пилота от внешнего излучения секторов
                 playerErosionLevel -= 12.0f * deltaTime;
             } else {
                 if (currentZoneErosion > 0.0f) {
@@ -681,12 +620,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
                     playerErosionLevel -= 4.0f * deltaTime;
                 }
             }
-            
+
             if (playerErosionLevel > 100.0f) playerErosionLevel = 100.0f;
             if (playerErosionLevel < 0.0f) playerErosionLevel = 0.0f;
 
             if (playerErosionLevel > EROSION_DAMAGE_THRESHOLD && !titan.isPiloted) {
-                playerHealth -= 10.0f * deltaTime; 
+                playerHealth -= 10.0f * deltaTime;
                 if (playerHealth < 0.0f) playerHealth = 0.0f;
             }
         }
@@ -703,86 +642,100 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
                 if (currentSectorMap[x][y] == 1) {
                     // Разрушаемые завалы: Прочность бетона влияет на цвет плиты
                     float damageFactor = wallDurability[x][y] / 100.0f;
-                    PushCircle(vBuffer, sp.x, sp.y, 16.0f, width, height, {0.32f * damageFactor, 0.35f * damageFactor, 0.38f * damageFactor, 1.0f}, 4);
+                    PushCircle(vBuffer, sp.x, sp.y, 16.0f, width, height, { 0.32f * damageFactor, 0.35f * damageFactor, 0.38f * damageFactor, 1.0f }, 4);
                 } else {
                     // Отображение эфирных аномалий пола
                     if (etherErosionMap[x][y] > 0.0f) {
-                        PushCircle(vBuffer, sp.x, sp.y, 2.0f, width, height, {0.8f, 0.55f, 0.1f, 0.8f}, 4);
+                        PushCircle(vBuffer, sp.x, sp.y, 2.0f, width, height, { 0.8f, 0.55f, 0.1f, 0.8f }, 4);
                     } else {
-                        PushCircle(vBuffer, sp.x, sp.y, 1.5f, width, height, {0.15f, 0.18f, 0.2f, 1.0f}, 4);
+                        PushCircle(vBuffer, sp.x, sp.y, 1.5f, width, height, { 0.15f, 0.18f, 0.2f, 1.0f }, 4);
                     }
                 }
             }
         }
 
         // 2. Отрисовка роя противников (Вермины — Красные маркеры)
+        bool isRadarActive = (playerMode == UnitMode::Scout) || (titan.systems.sensorLink >= 30.0f);
         for (const auto& e : enemies) {
             if (!e.isAlive) continue;
-            ScreenPoint sp = isoCamera.WorldToScreen(e.position, cameraTarget);
-            PushCircle(vBuffer, sp.x, sp.y, 7.5f, width, height, {0.92f, 0.25f, 0.25f, 1.0f}, 8);
+            // Враги отображаются на радаре Pip-Pad только если исправно реле связи
+            if (isRadarActive || (playerMode == UnitMode::Scout)) {
+                ScreenPoint sp = isoCamera.WorldToScreen(e.position, cameraTarget);
+                PushCircle(vBuffer, sp.x, sp.y, 7.5f, width, height, { 0.92f, 0.25f, 0.25f, 1.0f }, 8);
+            }
         }
 
         // 3. Отрисовка лазерных трассеров пуль
         for (const auto& b : bullets) {
             if (!b.isAlive) continue;
             ScreenPoint sp = isoCamera.WorldToScreen(b.current, cameraTarget);
-            PushCircle(vBuffer, sp.x, sp.y, 2.5f, width, height, {1.0f, 0.95f, 0.5f, 1.0f}, 4);
+            PushCircle(vBuffer, sp.x, sp.y, 2.5f, width, height, { 1.0f, 0.95f, 0.5f, 1.0f }, 4);
         }
 
         // 4. Отрисовка тактического прицела мыши Pip-Pad
         ScreenPoint spMouse = isoCamera.WorldToScreen(mouseWorldPos, cameraTarget);
-        PushCircle(vBuffer, spMouse.x, spMouse.y, 11.0f, width, height, {1.0f, 0.7f, 0.0f, 0.5f}, 8);
-        PushCircle(vBuffer, spMouse.x, spMouse.y, 3.0f, width, height, {1.0f, 0.7f, 0.0f, 1.0f}, 4);
+        PushCircle(vBuffer, spMouse.x, spMouse.y, 11.0f, width, height, { 1.0f, 0.7f, 0.0f, 0.5f }, 8);
+        PushCircle(vBuffer, spMouse.x, spMouse.y, 3.0f, width, height, { 1.0f, 0.7f, 0.0f, 1.0f }, 4);
 
-        // 5. Отрисовка ИИ-напарника BT-72 (Если игрок снаружи пешком)
+        // 5. Отрисовка СОЮЗНОГО ТАНКА С ИИ (Если игрок снаружи пешком)
         if (!titan.isPiloted) {
             ScreenPoint sTitan = isoCamera.WorldToScreen(titan.position, cameraTarget);
-            PushCircle(vBuffer, sTitan.x, sTitan.y, 15.0f, width, height, {0.05f, 0.45f, 0.85f, 1.0f}, 6);
+            PushCircle(vBuffer, sTitan.x, sTitan.y, 15.0f, width, height, { 0.05f, 0.45f, 0.85f, 1.0f }, 6);
         }
 
-        // 6. Отрисовка маркера игрока (Скаут или ведомый Мех в режиме пилотирования)
+        // 6. Отрисовка маркера игрока (Скаут или управляемый Танк)
         ScreenPoint sPlayer = isoCamera.WorldToScreen(playerPos, cameraTarget);
         if (playerMode == UnitMode::Scout) {
-            PushCircle(vBuffer, sPlayer.x, sPlayer.y, 9.0f, width, height, {0.18f, 0.85f, 0.4f, 1.0f}, 8);
+            PushCircle(vBuffer, sPlayer.x, sPlayer.y, 9.0f, width, height, { 0.18f, 0.85f, 0.4f, 1.0f }, 8);
         } else {
-            PushCircle(vBuffer, sPlayer.x, sPlayer.y, 17.0f, width, height, {0.02f, 0.52f, 0.98f, 1.0f}, 6);
+            PushCircle(vBuffer, sPlayer.x, sPlayer.y, 17.0f, width, height, { 0.02f, 0.52f, 0.98f, 1.0f }, 6);
         }
 
         // 7. Отрисовка Вышки связи региона (Vault 17 Relay Tower)
         ScreenPoint spTower = isoCamera.WorldToScreen(towerPosition, cameraTarget);
         if (regionalGrid.towerSyncRecovered) {
-            PushCircle(vBuffer, spTower.x, spTower.y, 14.0f, width, height, {0.0f, 0.6f, 1.0f, 1.0f}, 3);
+            PushCircle(vBuffer, spTower.x, spTower.y, 14.0f, width, height, { 0.0f, 0.6f, 1.0f, 1.0f }, 3);
         } else {
-            PushCircle(vBuffer, spTower.x, spTower.y, 14.0f, width, height, {0.25f, 0.2f, 0.2f, 1.0f}, 3);
+            PushCircle(vBuffer, spTower.x, spTower.y, 14.0f, width, height, { 0.25f, 0.2f, 0.2f, 1.0f }, 3);
         }
 
+        // Индикаторы состояния повреждения узлов Танка с ИИ на HUD в левом углу
+        if (playerMode == UnitMode::Titan) {
+            float indicatorY = (height - 45.0f) - 30.0f;
+            Vertex tracksCol = (titan.systems.tracksCondition > 40.0f) ? Vertex{0.2f, 0.8f, 0.2f, 1.0f} : Vertex{0.9f, 0.2f, 0.2f, 1.0f};
+            PushCircle(vBuffer, 45.0f + 10.0f, indicatorY, 4.0f, width, height, tracksCol, 4);
+            
+            Vertex turretCol = (titan.systems.turretStatus > 50.0f) ? Vertex{0.2f, 0.8f, 0.2f, 1.0f} : Vertex{0.9f, 0.2f, 0.2f, 1.0f};
+            PushCircle(vBuffer, 45.0f + 30.0f, indicatorY, 4.0f, width, height, turretCol, 4);
+                }
+
         // 8. НАШ КАСТОМНЫЙ ВОЕННЫЙ HUD СРЕДСТВАМИ DX11 (Отрисовка шкал биометрии)
-        float barWidth = 280.0f; 
+        float barWidth = 280.0f;
         float barHeight = 12.0f;
-        
+
         // Шкала Здоровья (В нижнем левом углу)
-        float bx1 = 45.0f; 
+        float bx1 = 45.0f;
         float by1 = height - 45.0f;
         float healthRatio = playerHealth / playerMaxHealth;
 
         ScreenPoint hpBg0 = PixelsToNDC(bx1, by1, width, height);
         ScreenPoint hpBg1 = PixelsToNDC(bx1 + barWidth, by1 + barHeight, width, height);
-        vBuffer.push_back({hpBg0.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({hpBg1.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({hpBg0.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({hpBg1.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({hpBg1.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({hpBg0.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({ hpBg0.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ hpBg1.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ hpBg0.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ hpBg1.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ hpBg1.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ hpBg0.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
 
         if (healthRatio > 0.0f) {
             ScreenPoint h1 = PixelsToNDC(bx1 + (barWidth * healthRatio), by1 + barHeight, width, height);
-            Vertex hCol = (playerMode == UnitMode::Titan) ? Vertex{0.0f, 0.52f, 0.95f, 1.0f} : Vertex{0.18f, 0.85f, 0.4f, 1.0f};
-            vBuffer.push_back({hpBg0.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({h1.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({hpBg0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({h1.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({h1.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({hpBg0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
+            Vertex hCol = (playerMode == UnitMode::Titan) ? Vertex{ 0.0f, 0.52f, 0.95f, 1.0f } : Vertex{ 0.18f, 0.85f, 0.4f, 1.0f };
+            vBuffer.push_back({ hpBg0.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a });
+            vBuffer.push_back({ h1.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a });
+            vBuffer.push_back({ hpBg0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a });
+            vBuffer.push_back({ h1.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a });
+            vBuffer.push_back({ h1.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a });
+            vBuffer.push_back({ hpBg0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a });
         }
 
         // Шкала Эфирной Эрозии (В нижнем правом углу)
@@ -792,22 +745,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
         ScreenPoint erBg0 = PixelsToNDC(bx2, by2, width, height);
         ScreenPoint erBg1 = PixelsToNDC(bx2 + barWidth, by2 + barHeight, width, height);
-        vBuffer.push_back({erBg0.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({erBg1.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({erBg0.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({erBg1.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({erBg1.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({erBg0.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({ erBg0.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ erBg1.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ erBg0.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ erBg1.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ erBg1.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
+        vBuffer.push_back({ erBg0.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f });
 
         if (erosionRatio > 0.0f) {
             ScreenPoint e1 = PixelsToNDC(bx2 + (barWidth * erosionRatio), by2 + barHeight, width, height);
-            Vertex eCol = {0.85f, 0.5f, 0.05f, 1.0f}; // Предупреждающее оранжевое свечение эфира
-            vBuffer.push_back({erBg0.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
-            vBuffer.push_back({e1.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
-            vBuffer.push_back({erBg0.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
-            vBuffer.push_back({e1.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
-            vBuffer.push_back({e1.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
-            vBuffer.push_back({erBg0.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
+            Vertex eCol = { 0.85f, 0.5f, 0.05f, 1.0f }; // Предупреждающее оранжевое свечение эфира
+            vBuffer.push_back({ erBg0.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
+            vBuffer.push_back({ e1.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
+            vBuffer.push_back({ erBg0.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
+            vBuffer.push_back({ e1.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
+            vBuffer.push_back({ e1.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
+            vBuffer.push_back({ erBg0.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
         }
 
         // ЗАГРУЗКА И СИНХРОНИЗАЦИЯ СГЕНЕРИРОВАННОЙ ГЕОМЕТРИИ В ВИДЕОПАМЯТЬ
@@ -817,23 +770,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         g_pd3dDeviceContext->Unmap(g_pVertexBuffer, 0);
 
         // ФАЗА РЕНДЕРИНГА DIRECTX 11
-        const float clear_color[] = { 0.05f, 0.05f, 0.06f, 1.0f }; 
+        const float clear_color[] = { 0.05f, 0.05f, 0.06f, 1.0f };
         g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
         g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color);
 
         D3D11_VIEWPORT vp = { 0.0f, 0.0f, width, height, 0.0f, 1.0f };
         g_pd3dDeviceContext->RSSetViewports(1, &vp);
 
-        UINT stride = sizeof(Vertex); 
+        UINT stride = sizeof(Vertex);
         UINT offset = 0;
         g_pd3dDeviceContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
         g_pd3dDeviceContext->IASetInputLayout(g_pInputLayout);
         g_pd3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         g_pd3dDeviceContext->VSSetShader(g_pVertexShader, nullptr, 0);
         g_pd3dDeviceContext->PSSetShader(g_pPixelShader, nullptr, 0);
-// Аппаратная отрисовка всего сформированного буфера за один вызов
+
         g_pd3dDeviceContext->Draw(static_cast<UINT>(vBuffer.size()), 0);
-        g_pSwapChain->Present(1, 0); // Синхронизация кадров включена (V-Sync)
+        g_pSwapChain->Present(1, 0);
     }
 
     // ДЕИНИЦИАЛИЗАЦИЯ И ОЧИСТКА ВСЕХ СИСТЕМНЫХ КОМПОНЕНТОВ DIRECT3D
@@ -841,7 +794,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     if (g_pInputLayout) g_pInputLayout->Release();
     if (g_pVertexShader) g_pVertexShader->Release(); 
     if (g_pPixelShader) g_pPixelShader->Release();
-    
+
     CleanupRenderTarget();
     if (g_pSwapChain) { g_pSwapChain->Release(); g_pSwapChain = nullptr; }
     if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
@@ -849,7 +802,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     DestroyWindow(hwnd); 
     UnregisterClassW(L"PureIsoDX11", hInstance);
-    
+
     return 0;
 }
 
