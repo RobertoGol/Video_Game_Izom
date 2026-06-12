@@ -5,7 +5,6 @@
 #include "Mechanics.hpp"
 
 // Подключаем наш заголовочный файл глобальных систем секторов
-#include "main.hpp"
 #pragma comment(lib, "d3dcompiler.lib")
 
 // ФИЗИЧЕСКОЕ ВЫДЕЛЕНИЕ ПАМЯТИ ПОД ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
