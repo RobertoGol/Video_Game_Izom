@@ -18,6 +18,7 @@ add_executable(Video_Game_Izom
     Data/Physics/Tactics.cpp
     Data/Physics/Tank.cpp
     Data/Player/Player.cpp
+    Data/Physics/Grid.cpp
 )
 
 

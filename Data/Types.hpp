@@ -56,3 +56,21 @@ struct StatModifiers {
     float erosionResistance = 0.0f; bool isVehicleMode = false;
     std::wstring weaponLabel = L"STANDARD CARBINE";
 };
+
+// ТИТАНФОЛЛ 2 & БУНКЕР v15: Дополнительные тактические стейты
+struct VortexShieldState {
+    bool isActive = false;
+    float energy = 100.0f;
+    int caughtBulletsCount = 0;
+};
+
+struct LockOnTarget {
+    int enemyIndex = -1;
+    int locksCount = 0;
+    bool isFullyLocked = false;
+};
+
+struct Vault17Progression {
+    bool hasFoundPipPad = false; // По лору v15 изначально равен false!
+    Vector3D pipPadSpawnPos = { 8.0f, 6.0f, 0.0f }; // Координаты лежащего планшета
+};

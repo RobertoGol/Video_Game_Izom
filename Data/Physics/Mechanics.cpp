@@ -1,8 +1,13 @@
-#include "main.hpp"
+#include "../../main.hpp"
 #include "Mechanics.hpp"
-#include "Player.hpp"
+#include "../Player/Player.hpp"
+#include "Collisions.hpp"
 #include <cmath>
 #include <algorithm>
+#include "Grid.hpp
+
+// Объявляем внешнюю структуру щита Иона для этого модуля
+extern VortexShieldState ionShield;
 
 void ProcessGameMechanics(float deltaTime) {
     // 1. ОБНОВЛЕНИЕ БАЛЛИСТИКИ И ТРАЕКТОРИЙ СНАРЯДОВ
@@ -148,4 +153,24 @@ void ProcessGameMechanics(float deltaTime) {
             if (playerHealth < 0.0f) playerHealth = 0.0f;
         }
     }
+    ProcessVault17GridCascade(deltaTime);
+}
+
+// Новая лорная функция из GMyGameDoNotTouch для симуляции контактного входящего урона по Танку
+void ProcessIncomingDamageToTitan(float damageAmt, float deltaTime) {
+    // ВСТАВЛЕНО: Если активен Вихревой щит Иона — урон обнуляется, а снаряд/укус уходит в батарею
+    if (gameClasses.GetActiveTitanClass() == TitanClass::Ion && ionShield.isActive) {
+        ionShield.caughtBulletsCount++; // Ловим и копим для ответного залпа
+        return; 
+    }
+
+    // Если щит выключен — урон честно распределяется по 4 внутренним узлам танка
+    int targetComponent = rand() % 4;
+    if (targetComponent == 0) titan.systems.tracksCondition -= damageAmt; 
+    else if (targetComponent == 1) titan.systems.turretStatus -= damageAmt;   
+    else if (targetComponent == 2) titan.systems.sensorLink -= damageAmt;     
+    else titan.systems.coreEnergy -= damageAmt;                               
+
+    playerHealth = (titan.systems.coreEnergy + titan.systems.tracksCondition + titan.systems.turretStatus + titan.systems.sensorLink) * 1.5f;
+    if (titan.systems.coreEnergy <= 0.0f) playerHealth = 0.0f; // Взрыв ядра
 }

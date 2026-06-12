@@ -45,7 +45,6 @@ void Vault17ClassManager::EnterVehicle() {
     isTacticalActive = false;
     grapple.isAttached = false;
     aWallShield.isDeployed = false;
-    isPulseBladeActive = false;
     isPhaseDimensionActive = false;
     UpdateActiveStats();
 }
@@ -67,19 +66,19 @@ void Vault17ClassManager::UpdateCooldowns(float deltaTime) {
             isTacticalActive = false;
             aWallShield.isDeployed = false;
             isPulseBladeActive = false;
-            isPhaseDimensionActive = false; // Возвращаемся из параллельного измерения в реальный мир
+            isPhaseDimensionActive = false; // Возвращаемся из Изнанки в реальный мир
             UpdateActiveStats();
         }
     }
     
-    // Мягкая регенерация ХП от Стимулятора (Stim) во время действия
     if (isTacticalActive && activePilotClass == PilotClass::Stim && !isInsideVehicle) {
         playerHealth = std::min(playerMaxHealth, playerHealth + 15.0f * deltaTime);
     }
 }
 
 void Vault17ClassManager::ActivateTacticalSkill(const Vector3D& mousePos, const Vector3D& pilotPos) {
-    if (isInsideVehicle || tacticalCooldown > 0.0f || isTacticalActive) return;
+    // Если Pip-Pad еще не найден — тактические умения костюма заблокированы!
+    if (!bunkerProgression.hasFoundPipPad || isInsideVehicle || tacticalCooldown > 0.0f || isTacticalActive) return;
     
     isTacticalActive = true;
     
@@ -107,9 +106,9 @@ void Vault17ClassManager::ActivateTacticalSkill(const Vector3D& mousePos, const 
             break;
 
         case PilotClass::PhaseShift:
-            // Проваливаемся в параллельный пространственный сдвиг
+            // КАНOН TITANFALL 2: Проваливаемся в фазовое измерение
             isPhaseDimensionActive = true; 
-            tacticalActiveTimer = 2.5f; // Фаза длится 2.5 секунды
+            tacticalActiveTimer = 2.5f; 
             tacticalCooldown = 18.0f;
             break;
 
@@ -126,17 +125,8 @@ void Vault17ClassManager::ActivateTacticalSkill(const Vector3D& mousePos, const 
             tacticalCooldown = 15.0f;
             break;
 
-        case PilotClass::PulseBlade:
-            isPulseBladeActive = true;
-            pulseBladePos = mousePos;
-            pulseBladeRadius = 5.5f;
-            tacticalActiveTimer = 4.0f; 
-            tacticalCooldown = 12.0f;
-            break;
-
-        case PilotClass::HoloPilot:
-            tacticalActiveTimer = 4.0f; 
-            tacticalCooldown = 10.0f;
+        default:
+            isTacticalActive = false;
             break;
     }
     UpdateActiveStats();
@@ -155,8 +145,6 @@ void Vault17ClassManager::ProcessGrapplePhysics(Vector3D& pilotPos, float deltaT
         grapple.velocity.y = (tdy / currentDist) * pullForce;
         
         float progress = 1.0f - (currentDist / grapple.length);
-        if (progress < 0.0f) progress = 0.0f;
-        if (progress > 1.0f) progress = 1.0f;
         pilotPos.z = std::sin(progress * 3.1415926f) * 1.8f; 
 
         pilotPos.x += grapple.velocity.x * deltaTime;
@@ -178,39 +166,18 @@ void Vault17ClassManager::UpdateActiveStats() {
             case PilotClass::Grapple:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.8f;
                 currentStats.weaponLabel = L"PILOT: GRAPPLE GEAR"; break;
-            case PilotClass::Cloak:
-                currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.2f;
-                currentStats.weaponLabel = isTacticalActive ? L"CLOAK FIELD ACTIVE" : L"STANDARD CARBINE"; break;
             case PilotClass::Stim:
                 currentStats.maxHealth = 100.0f; 
-                // Адекватное тактическое ускорение Стима без сумасшедших оверспидов
+                // ИСПРАВЛЕНO: Скорость строго 6.8f по канону баланса
                 currentStats.moveSpeed = isTacticalActive ? 6.8f : 5.5f; 
                 currentStats.weaponLabel = L"STIM CARBINE"; break;
             case PilotClass::PhaseShift:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.5f;
-                // Фазовый сдвиг блокирует абсолютно любой урон и накопление Эфирной Эрозии секторов
-                currentStats.erosionResistance = isTacticalActive ? 1.0f : 0.0f;
-                currentStats.weaponLabel = isPhaseDimensionActive ? L"PHASE SHIFT ACTIVE" : L"PHASE EXPERIMENTAL RIFLE"; break;
-            case PilotClass::AWall:
-                currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.3f;
-                currentStats.damageMultiplier = isTacticalActive ? 1.7f : 1.0f; 
-                currentStats.weaponLabel = L"AMP-TACTICAL CARBINE"; break;
+                currentStats.erosionResistance = isTacticalActive ? 1.0f : 0.0f; // 100% резист в фазе
+                currentStats.weaponLabel = isPhaseDimensionActive ? L"PHASE DIMENSION" : L"PHASE RIFLE"; break;
             default:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.5f;
                 currentStats.weaponLabel = L"STANDARD CARBINE"; break;
-        }
-    } else {
-        currentStats.isVehicleMode = true;
-        currentStats.erosionResistance = 1.0f; 
-
-        switch (activeTitanClass) {
-            case TitanClass::Ion:       currentStats.maxHealth = 500.0f; currentStats.moveSpeed = 3.5f; currentStats.weaponLabel = L"ION: SPLITTER RIFLE"; break;
-            case TitanClass::Scorch:    currentStats.maxHealth = 650.0f; currentStats.moveSpeed = 2.4f; currentStats.weaponLabel = L"SCORCH: THERMITE LAUNCHER"; break;
-            case TitanClass::Northstar: currentStats.maxHealth = 350.0f; currentStats.moveSpeed = 4.5f; currentStats.weaponLabel = L"NORTHSTAR: PLASMA RAILGUN"; break;
-            case TitanClass::Ronin:     currentStats.maxHealth = 350.0f; currentStats.moveSpeed = 4.8f; currentStats.weaponLabel = L"RONIN: LEADWALL SHOTGUN"; break;
-            case TitanClass::Tone:      currentStats.maxHealth = 500.0f; currentStats.moveSpeed = 3.5f; currentStats.weaponLabel = L"TONE: 40mm TRACKING CANNON"; break;
-            case TitanClass::Legion:    currentStats.maxHealth = 650.0f; currentStats.moveSpeed = 2.2f; currentStats.weaponLabel = L"LEGION: PREDATOR CANNON"; break;
-            case TitanClass::Monarch:   currentStats.maxHealth = 500.0f; currentStats.moveSpeed = 3.6f; currentStats.weaponLabel = L"MONARCH: XO-16 UPGRADE CORE"; break;
         }
     }
 }
