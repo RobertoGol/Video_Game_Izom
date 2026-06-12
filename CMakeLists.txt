@@ -5,9 +5,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Указываем, что собираем стандартное оконное приложение Windows (без консоли на заднем плане)
-add_executable(${PROJECT_NAME} WIN32 
-    main.cpp
+add_executable(Video_Game_Izom 
+    main.cpp 
+    Tactics.cpp 
+    Player.cpp 
+    Enemies.cpp 
+    Mechanics.cpp
 )
+
 
 # Линкуем нативные библиотеки DirectX 11, которые есть в любой Windows системе
 target_link_libraries(${PROJECT_NAME}
