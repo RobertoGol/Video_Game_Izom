@@ -890,32 +890,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
                 ScreenPoint sp = isoCamera.WorldToScreen(blockPos, cameraTarget);
 
                 if (currentSectorMap[x][y] == 1) {
-                    // Рассчитываем коэффициент прочности бетона (от 0.0 до 1.0)
+                    // РАЗРУШАЕМЫЕ СТЕНЫ: Рассчитываем коэффициент прочности бетона (от 0.0 до 1.0)
                     float damageFactor = wallDurability[x][y] / 100.0f;
-                    // Чем меньше прочность, тем темнее и разрушеннее выглядит блок
+                    // Чем меньше прочность завала, тем темнее и разрушеннее выглядит блок на экране
                     PushCircle(vBuffer, sp.x, sp.y, 16.0f, width, height, {0.32f * damageFactor, 0.35f * damageFactor, 0.38f * damageFactor, 1.0f}, 4);
                 } else {
-                    // Если под ногами зона Эфирной Эрозии — подсвечиваем пол тускло-желтым аномальным цветом
+                    // ЭФИРНАЯ ЭРОЗИЯ (Ether Erosion): если под ногами аномальная зона, подсвечиваем пол тускло-желтым
                     if (etherErosionMap[x][y] > 0.0f) {
-                        PushCircle(vBuffer, sp.x, sp.y, 2.0f, width, height, {0.8f, 0.6f, 0.1f, 1.0f}, 4);
+                        PushCircle(vBuffer, sp.x, sp.y, 2.0f, width, height, {0.8f, 0.55f, 0.1f, 0.8f}, 4);
                     } else {
+                        // Чистый пол — стандартные тусклые маркеры проходов
                         PushCircle(vBuffer, sp.x, sp.y, 1.5f, width, height, {0.15f, 0.18f, 0.2f, 1.0f}, 4);
                     }
-                } else {
-                    // Пол — мелкие тусклые маркеры проходов
-                    PushCircle(vBuffer, sp.x, sp.y, 1.5f, width, height, {0.15f, 0.18f, 0.2f, 1.0f}, 4);
                 }
             }
         }
 
-        // 2. Отрисовка роя противников (Вермины — Красные маркеры опасности)
+        // 2. Отрисовка роя противников (Вермины — Красные маркеры биологической опасности)
         for (const auto& e : enemies) {
             if (!e.isAlive) continue;
             ScreenPoint sp = isoCamera.WorldToScreen(e.position, cameraTarget);
             PushCircle(vBuffer, sp.x, sp.y, 7.5f, width, height, {0.92f, 0.25f, 0.25f, 1.0f}, 8);
         }
 
-        // 3. Отрисовка лазерных трассеров (Желтые точки снарядов)
+        // 3. Отрисовка лазерных трассеров (Желтые точки летящих снарядов)
         for (const auto& b : bullets) {
             if (!b.isAlive) continue;
             ScreenPoint sp = isoCamera.WorldToScreen(b.current, cameraTarget);
@@ -927,46 +925,78 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         PushCircle(vBuffer, spMouse.x, spMouse.y, 11.0f, width, height, {1.0f, 0.7f, 0.0f, 0.5f}, 8);
         PushCircle(vBuffer, spMouse.x, spMouse.y, 3.0f, width, height, {1.0f, 0.7f, 0.0f, 1.0f}, 4);
 
-        // 5. Отрисовка маркера игрока (Скаут-пехотинец или тяжелый Титан BT-72)
+        // 5. Отрисовка ИИ-НАПАРНИКА BT-72 (Если игрок бегает снаружи пешком)
+        if (!titan.isPiloted) {
+            ScreenPoint sTitan = isoCamera.WorldToScreen(titan.position, cameraTarget);
+            // Автономный BT-72 рендерится как массивный сине-стальной шестиугольник
+            PushCircle(vBuffer, sTitan.x, sTitan.y, 15.0f, width, height, {0.05f, 0.45f, 0.85f, 1.0f}, 6);
+        }
+
+        // 6. Отрисовка маркера самого игрока (Скаут-пехотинец или ведомый Мех в режиме пилотирования)
         ScreenPoint sPlayer = isoCamera.WorldToScreen(playerPos, cameraTarget);
         if (playerMode == UnitMode::Scout) {
+            // Скаут-оперативник — зеленый маркер биометрии костюма
             PushCircle(vBuffer, sPlayer.x, sPlayer.y, 9.0f, width, height, {0.18f, 0.85f, 0.4f, 1.0f}, 8);
         } else {
-            // Мех BT-72 рендерится как массивный контур из 6 сегментов
-            PushCircle(vBuffer, sPlayer.x, sPlayer.y, 16.0f, width, height, {0.02f, 0.5f, 0.95f, 1.0f}, 6);
+            // Если игрок внутри кабины — рендерим увеличенный пилотируемый контур Меха
+            PushCircle(vBuffer, sPlayer.x, sPlayer.y, 17.0f, width, height, {0.02f, 0.52f, 0.98f, 1.0f}, 6);
         }
 
-        // 6. КАСТОМНЫЙ ИНДУСТРИАЛЬНЫЙ HUD СРЕДСТВАМИ DX11 (Полоска целостности шасси)
+        // 7. НАШ КАСТОМНЫЙ ВОЕННЫЙ HUD (Отрисовка шкал биометрии)
         float barWidth = 280.0f; 
-        float barHeight = 14.0f;
-        float bx = 45.0f; 
-        float by = height - 45.0f;
+        float barHeight = 12.0f;
+        
+        // --- ШКАЛА ЗДОРОВЬЯ (В нижнем левом углу) ---
+        float bx1 = 45.0f; 
+        float by1 = height - 45.0f;
         float healthRatio = playerHealth / playerMaxHealth;
 
-        // Отрисовка подложки бара (Темно-серый цвет)
-        ScreenPoint b0 = PixelsToNDC(bx, by, width, height);
-        ScreenPoint b1 = PixelsToNDC(bx + barWidth, by + barHeight, width, height);
-        vBuffer.push_back({b0.x, b0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({b1.x, b0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({b0.x, b1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({b1.x, b0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({b1.x, b1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
-        vBuffer.push_back({b0.x, b1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        ScreenPoint hpBg0 = PixelsToNDC(bx1, by1, width, height);
+        ScreenPoint hpBg1 = PixelsToNDC(bx1 + barWidth, by1 + barHeight, width, height);
+        vBuffer.push_back({hpBg0.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({hpBg1.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({hpBg0.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({hpBg1.x, hpBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({hpBg1.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({hpBg0.x, hpBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
 
-        // Отрисовка активной полосы биометрии (Зеленая для Скаута, Синяя для ОБЧР)
-        ScreenPoint h1 = PixelsToNDC(bx + (barWidth * healthRatio), by + barHeight, width, height);
-        Vertex hCol = (playerMode == UnitMode::Titan) ? Vertex{0.0f, 0.52f, 0.95f, 1.0f} : Vertex{0.18f, 0.85f, 0.4f, 1.0f};
         if (healthRatio > 0.0f) {
-            vBuffer.push_back({b0.x, b0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({h1.x, b0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({b0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({h1.x, b0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
+            ScreenPoint h1 = PixelsToNDC(bx1 + (barWidth * healthRatio), by1 + barHeight, width, height);
+            Vertex hCol = (playerMode == UnitMode::Titan) ? Vertex{0.0f, 0.52f, 0.95f, 1.0f} : Vertex{0.18f, 0.85f, 0.4f, 1.0f};
+            vBuffer.push_back({hpBg0.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
+            vBuffer.push_back({h1.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
+            vBuffer.push_back({hpBg0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
+            vBuffer.push_back({h1.x, hpBg0.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
             vBuffer.push_back({h1.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
-            vBuffer.push_back({b0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
+            vBuffer.push_back({hpBg0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a});
         }
 
-        // ЗАГРУЗКА И СИНХРОНИЗАЦИЯ СГЕНЕРИРОВАННОЙ ГЕОМЕТРИИ В ВИДЕОПАМЯТЬ
-        D3D11_MAPPED_SUBRESOURCE ms;
+        // --- ШКАЛА ЭФИРНОЙ ЭРОЗИИ (В нижнем правом углу) ---
+        float bx2 = width - barWidth - 45.0f;
+        float by2 = height - 45.0f;
+        float erosionRatio = playerErosionLevel / 100.0f;
+
+        ScreenPoint erBg0 = PixelsToNDC(bx2, by2, width, height);
+        ScreenPoint erBg1 = PixelsToNDC(bx2 + barWidth, by2 + barHeight, width, height);
+        vBuffer.push_back({erBg0.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({erBg1.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({erBg0.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({erBg1.x, erBg0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({erBg1.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+        vBuffer.push_back({erBg0.x, erBg1.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
+
+        if (erosionRatio > 0.0f) {
+            ScreenPoint e1 = PixelsToNDC(bx2 + (barWidth * erosionRatio), by2 + barHeight, width, height);
+            // Цвет эрозии — предупреждающий оранжево-желтый (Эфирное свечение)
+            Vertex eCol = {0.85f, 0.5f, 0.05f, 1.0f};
+            vBuffer.push_back({erBg0.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
+            vBuffer.push_back({e1.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
+            vBuffer.push_back({erBg0.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
+            vBuffer.push_back({e1.x, erBg0.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
+            vBuffer.push_back({e1.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
+            vBuffer.push_back({erBg0.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a});
+        }
+
         g_pd3dDeviceContext->Map(g_pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);
         memcpy(ms.pData, vBuffer.data(), sizeof(Vertex) * vBuffer.size());
         g_pd3dDeviceContext->Unmap(g_pVertexBuffer, 0);
