@@ -67,7 +67,7 @@ void Vault17ClassManager::UpdateCooldowns(float deltaTime) {
             isTacticalActive = false;
             aWallShield.isDeployed = false;
             isPulseBladeActive = false;
-            isPhaseDimensionActive = false; // Возвращаемся из Фазового измерения в реальный мир
+            isPhaseDimensionActive = false; // Возвращаемся из параллельного измерения в реальный мир
             UpdateActiveStats();
         }
     }
@@ -107,7 +107,7 @@ void Vault17ClassManager::ActivateTacticalSkill(const Vector3D& mousePos, const 
             break;
 
         case PilotClass::PhaseShift:
-            // ТИТАНФОЛЛ 2 КАНОН: Проваливаемся в фазовую изнанку
+            // Проваливаемся в параллельный пространственный сдвиг
             isPhaseDimensionActive = true; 
             tacticalActiveTimer = 2.5f; // Фаза длится 2.5 секунды
             tacticalCooldown = 18.0f;
@@ -183,14 +183,14 @@ void Vault17ClassManager::UpdateActiveStats() {
                 currentStats.weaponLabel = isTacticalActive ? L"CLOAK FIELD ACTIVE" : L"STANDARD CARBINE"; break;
             case PilotClass::Stim:
                 currentStats.maxHealth = 100.0f; 
-                // Адекватное, сбалансированное тактическое ускорение Стима взамен 9.8f
+                // Адекватное тактическое ускорение Стима без сумасшедших оверспидов
                 currentStats.moveSpeed = isTacticalActive ? 6.8f : 5.5f; 
                 currentStats.weaponLabel = L"STIM CARBINE"; break;
             case PilotClass::PhaseShift:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.5f;
-                // В Фазовом измерении урон от Эфирной Эрозии СЕКТОРОВ полностью поглощается (100% резист)
+                // Фазовый сдвиг блокирует абсолютно любой урон и накопление Эфирной Эрозии секторов
                 currentStats.erosionResistance = isTacticalActive ? 1.0f : 0.0f;
-                currentStats.weaponLabel = isPhaseDimensionActive ? L"PHASE SHIFT INDUCTION" : L"PHASE EXPERIMENTAL RIFLE"; break;
+                currentStats.weaponLabel = isPhaseDimensionActive ? L"PHASE SHIFT ACTIVE" : L"PHASE EXPERIMENTAL RIFLE"; break;
             case PilotClass::AWall:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.3f;
                 currentStats.damageMultiplier = isTacticalActive ? 1.7f : 1.0f; 

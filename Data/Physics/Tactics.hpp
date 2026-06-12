@@ -3,6 +3,7 @@
 #include <vector>
 #include "../Types.hpp"
 
+// Силовые параметры троса Крюка-кошки
 struct GrapplePhysics {
     bool isAttached = false;
     Vector3D hookPoint;
@@ -10,6 +11,7 @@ struct GrapplePhysics {
     Vector3D velocity; 
 };
 
+// Защитный экран Э-ДАНЬ (A-Wall)
 struct DeployableShield {
     bool isDeployed = false;
     Vector3D position;
@@ -29,7 +31,7 @@ public:
     float tacticalActiveTimer;
     bool isTacticalActive;
 
-    // Внутренние параметры каноничных тактик Titanfall 2
+    // Внутренние параметры тактик по лору Titanfall 2
     GrapplePhysics grapple;
     DeployableShield aWallShield;
     Vector3D pulseBladePos;
