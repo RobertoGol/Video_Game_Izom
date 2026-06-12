@@ -7,39 +7,123 @@
 #include <cmath>
 #include <algorithm>
 
+// Автоматическая линковка системных библиотек Windows для DirectX 11
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
- // Для компиляции шейдеров "на лету"
-// ============================================================================
-// 1. СТРУКТУРЫ ДАННЫХ И ЛОРНЫЕ КОНСТАНТЫ (VAULT 17)
-// ============================================================================
-struct Vector3D { float x = 0.0f; float y = 0.0f; float z = 0.0f; };
-struct ScreenPoint { float x = 0.0f; float y = 0.0f; };
-enum class UnitMode { Scout, Titan };
+// 1. МАТЕМАТИЧЕСКИЕ И ИГРОВЫЕ СТРУКТУРЫ
+struct Vector3D { 
+    float x = 0.0f; 
+    float y = 0.0f; 
+    float z = 0.0f; 
+};
+
+struct ScreenPoint { 
+    float x = 0.0f; 
+    float y = 0.0f; 
+};
+
+enum class UnitMode { 
+    Scout, // Маневренная пехота (Arknights Endfield / Vault 17 Outrider)
+    Titan  // Тяжелый мех с автопушкой (BT-72 из Titanfall)
+};
 
 struct Bullet {
-    Vector3D start; Vector3D current; Vector3D direction;
-    float speed = 28.0f; float distanceTraveled = 0.0f; float maxDistance = 16.0f; bool isAlive = true;
+    Vector3D start; 
+    Vector3D current; 
+    Vector3D direction;
+    float speed = 28.0f; 
+    float distanceTraveled = 0.0f; 
+    float maxDistance = 16.0f; 
+    bool isAlive = true;
 };
 
 struct Enemy {
-    Vector3D position; float health = 35.0f; float speed = 2.4f; bool isAlive = true; float radius = 0.35f;
+    Vector3D position; 
+    float health = 35.0f; 
+    float speed = 2.4f; 
+    bool isAlive = true; 
+    float radius = 0.35f; // Радиус хитбокса Вермина (в метрах)
 };
 
-// Простейшая структура вершины для нашего DirectX 11 рендерера
+// Структура вершины для нашего DirectX 11 геометрического рендерера
 struct Vertex {
-    float x, y, z;
-    float r, g, b, a;
+    float x, y, z;      // Позиция в NDC координатах (-1.0 до 1.0)
+    float r, g, b, a;   // Цвет вершины (RGBA)
 };
 
-// 2. ИЗОМЕТРИЧЕСКАЯ КАМЕРА
-// Параметры карты секторов Убежища 17
+// 2. ИЗОМЕТРИЧЕСКАЯ КАМЕРА (Проекция под углом 30 градусов)
+class IsometricCamera {
+public:
+    const float ISO_COS = 0.8660254f; // cos(30)
+    const float ISO_SIN = 0.5000000f; // sin(30)
+    float zoom = 55.0f;               // Масштаб (пикселей в одном игровом метре)
+    ScreenPoint centerOffset = { 640.0f, 360.0f }; // Центр экрана (обновляется динамически)
+
+    // Матрица трансформации: перевод из 3D координат мира в 2D пиксели экрана
+    ScreenPoint WorldToScreen(const Vector3D& worldPos, const Vector3D& cameraTarget) const {
+        float relX = worldPos.x - cameraTarget.x;
+        float relY = worldPos.y - cameraTarget.y;
+        float relZ = worldPos.z - cameraTarget.z;
+        
+        ScreenPoint screen;
+        screen.x = (relX - relY) * ISO_COS;
+        screen.y = (relX + relY) * ISO_SIN - relZ;
+        
+        screen.x = (screen.x * zoom) + centerOffset.x;
+        screen.y = (screen.y * zoom) + centerOffset.y;
+        return screen;
+    }
+
+    // Обратная проекция: перевод из 2D пикселей мыши на экране в 3D координаты земли (Z = 0)
+    Vector3D ScreenToWorldGround(const ScreenPoint& screenPos, const Vector3D& cameraTarget) const {
+        float sx = (screenPos.x - centerOffset.x) / zoom;
+        float sy = (screenPos.y - centerOffset.y) / zoom;
+        
+        Vector3D world;
+        world.x = (sx / (2.0f * ISO_COS)) + (sy / (2.0f * ISO_SIN)) + cameraTarget.x;
+        world.y = (sy / (2.0f * ISO_SIN)) - (sx / (2.0f * ISO_COS)) + cameraTarget.y;
+        world.z = 0.0f;
+        return world;
+    }
+};
+
+// 3. ГЛОБАЛЬНЫЙ ИГРОВОЙ СТЭЙТ (ЛОГИКА ВСЕЛЕННОЙ)
+UnitMode playerMode = UnitMode::Scout;
+Vector3D playerPos = { 4.0f, 4.0f, 0.0f }; // Стартовая позиция внутри проходимой зоны
+float playerHealth = 100.0f;
+float playerMaxHealth = 100.0f;
+float playerSpeed = 5.5f;
+float fireCooldown = 0.0f;
+
+Vector3D cameraTarget = { 0.0f, 0.0f, 0.0f };
+IsometricCamera isoCamera;
+Vector3D mouseWorldPos;
+ScreenPoint currentMouseScreenPos;
+
+std::vector<Bullet> bullets;
+std::vector<Enemy> enemies;
+float enemySpawnTimer = 0.0f;
+int score = 0;
+
+// ГЛОБАЛЬНЫЕ ОБЪЕКТЫ DIRECTX 11
+ID3D11Device*           g_pd3dDevice = nullptr;
+ID3D11DeviceContext*    g_pd3dDeviceContext = nullptr;
+IDXGISwapChain*         g_pSwapChain = nullptr;
+ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
+
+// Объекты отрисовки геометрии низкого уровня
+ID3D11VertexShader*     g_pVertexShader = nullptr;
+ID3D11PixelShader*      g_pPixelShader = nullptr;
+ID3D11InputLayout*      g_pInputLayout = nullptr;
+ID3D11Buffer*           g_pVertexBuffer = nullptr;
+
+// 4. ДВУМЕРНАЯ КАРТА СЕКТОРОВ УБЕЖИЩА 17 / ПОВЕРХНОСТИ
+// 1 - Бетонный завал / Гермодверь / Стена, 0 - Проход / Чистый сектор
 const int MAP_WIDTH = 20;
 const int MAP_HEIGHT = 20;
 
-// 1 - Бетонный завал / Стена, 0 - Коридор / Проход архива
 int currentSectorMap[MAP_WIDTH][MAP_HEIGHT] = {
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
     {1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1},
@@ -63,139 +147,87 @@ int currentSectorMap[MAP_WIDTH][MAP_HEIGHT] = {
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
-// ============================================================================
-// 2. ИЗОМЕТРИЧЕСКАЯ КАМЕРА С ОБРАТНОЙ ПРОЕКЦИЕЙ МЫШИ
-// ============================================================================
-class IsometricCamera {
-public:
-    const float ISO_COS = 0.8660254f;
-    const float ISO_SIN = 0.5000000f;
-    float zoom = 55.0f; 
-    ScreenPoint centerOffset = { 640.0f, 360.0f };
-
-    ScreenPoint WorldToScreen(const Vector3D& worldPos, const Vector3D& cameraTarget) const {
-        float relX = worldPos.x - cameraTarget.x;
-        float relY = worldPos.y - cameraTarget.y;
-        float relZ = worldPos.z - cameraTarget.z;
-        ScreenPoint screen;
-        screen.x = (relX - relY) * ISO_COS;
-        screen.y = (relX + relY) * ISO_SIN - relZ;
-        screen.x = (screen.x * zoom) + centerOffset.x;
-        screen.y = (screen.y * zoom) + centerOffset.y;
-        return screen;
-    }
-
-    Vector3D ScreenToWorldGround(const ScreenPoint& screenPos, const Vector3D& cameraTarget) const {
-        float sx = (screenPos.x - centerOffset.x) / zoom;
-        float sy = (screenPos.y - centerOffset.y) / zoom;
-        Vector3D world;
-        world.x = (sx / (2.0f * ISO_COS)) + (sy / (2.0f * ISO_SIN)) + cameraTarget.x;
-        world.y = (sy / (2.0f * ISO_SIN)) - (sx / (2.0f * ISO_COS)) + cameraTarget.y;
-        world.z = 0.0f;
-        return world;
-    }
-};
-
-// ГЛОБАЛЬНЫЙ СТЭЙТ ИГРЫ
-UnitMode playerMode = UnitMode::Scout;
-Vector3D playerPos = { 2.0f, 2.0f, 0.0f }; // Спавн в безопасной зоне коридора
-float playerHealth = 100.0f;
-float playerMaxHealth = 100.0f;
-float playerSpeed = 5.5f;
-float fireCooldown = 0.0f;
-
-Vector3D cameraTarget = { 0.0f, 0.0f, 0.0f };
-IsometricCamera isoCamera;
-Vector3D mouseWorldPos;
-ScreenPoint currentMouseScreenPos;
-
-std::vector<Bullet> bullets;
-std::vector<Enemy> enemies; // Рой ранних верминов (Vermin)
-float enemySpawnTimer = 0.0f;
-int score = 0;
-
-// ГЛОБАЛЬНЫЕ ОБЪЕКТЫ DIRECTX 11
-ID3D11Device*           g_pd3dDevice = nullptr;
-ID3D11DeviceContext*    g_pd3dDeviceContext = nullptr;
-IDXGISwapChain*         g_pSwapChain = nullptr;
-ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
-ID3D11VertexShader*     g_pVertexShader = nullptr;
-ID3D11PixelShader*      g_pPixelShader = nullptr;
-ID3D11InputLayout*      g_pInputLayout = nullptr;
-ID3D11Buffer*           g_pVertexBuffer = nullptr;
-
-// Шейдеры (HLSL) зашитые в код
+// Встроенные HLSL-шейдеры в виде сырых строк для независимой компиляции
 const char* vertexShaderSrc = R"(
-struct VS_INPUT { float3 pos : POSITION; float4 col : COLOR; };
-struct PS_INPUT { float4 pos : SV_POSITION; float4 col : COLOR; };
-PS_INPUT main(VS_INPUT input) {
-    PS_INPUT output; output.pos = float4(input.pos, 1.0f); output.col = input.col; return output;
+struct VS_INPUT {
+    float3 pos : POSITION;
+    float4 col : COLOR;
 };
+struct PS_INPUT {
+    float4 pos : SV_POSITION;
+    float4 col : COLOR;
+};
+PS_INPUT main(VS_INPUT input) {
+    PS_INPUT output;
+    output.pos = float4(input.pos, 1.0f);
+    output.col = input.col;
+    return output;
+}
 )";
 
 const char* pixelShaderSrc = R"(
-struct PS_INPUT { float4 pos : SV_POSITION; float4 col : COLOR; };
-float4 main(PS_INPUT input) : SV_TARGET { return input.col; };
+struct PS_INPUT {
+    float4 pos : SV_POSITION;
+    float4 col : COLOR;
+};
+float4 main(PS_INPUT input) : SV_TARGET {
+    return input.col;
+}
 )";
-// ВСТАВКА 1: КАРТА И КОЛЛИЗИИ
-// ============================================================================
-// 3. СИСТЕМА ФИЗИКИ КОЛЛИЗИЙ И ТАКТИЧЕСКОЙ КАМЕРЫ (HELLDIVERS STYLE)
-// ============================================================================
+
+// 5. ФУНКЦИИ ВЫЧИСЛЕНИЯ КОЛЛИЗИЙ И ТАКТИЧЕСКИХ СИСТЕМ
 bool CheckWorldCollision(float nextX, float nextY, float radius) {
-    int checkPoints[4][2] = {
-        { (int)(nextX - radius), (int)(nextY - radius) },
-        { (int)(nextX + radius), (int)(nextY - radius) },
-        { (int)(nextX - radius), (int)(nextY + radius) },
-        { (int)(nextX + radius), (int)(nextY + radius) }
+    // Сканируем 4 граничные точки вокруг окружности хитбокса
+    float checkPoints[4][2] = {
+        { nextX - radius, nextY - radius },
+        { nextX + radius, nextY - radius },
+        { nextX - radius, nextY + radius },
+        { nextX + radius, nextY + radius }
     };
     for (int i = 0; i < 4; ++i) {
-        int tx = checkPoints[i][0]; int ty = checkPoints[i][1];
+        int tx = static_cast<int>(checkPoints[i][0]);
+        int ty = static_cast<int>(checkPoints[i][1]);
+        
+        // Край карты — это жесткая граница мира
         if (tx < 0 || tx >= MAP_WIDTH || ty < 0 || ty >= MAP_HEIGHT) return true;
+        // Если тайл равен 1 — там бетонная стена
         if (currentSectorMap[tx][ty] == 1) return true;
     }
     return false;
 }
 
-void UpdateHelldiversCamera(float deltaTime) {
-    // Смещение камеры в сторону прицела (30% веса к мышке)
-    float targetX = playerPos.x + (mouseWorldPos.x - playerPos.x) * 0.3f;
-    float targetY = playerPos.y + (mouseWorldPos.y - playerPos.y) * 0.3f;
-    
-    float maxDist = 4.5f; // Ограничение, чтобы игрок не улетал за экран
-    float dx = targetX - playerPos.x; float dy = targetY - playerPos.y;
-    float currentDist = std::sqrt(dx * dx + dy * dy);
-    
-    if (currentDist > maxDist) {
-        targetX = playerPos.x + (dx / currentDist) * maxDist;
-        targetY = playerPos.y + (dy / currentDist) * maxDist;
-    }
-    // Гладкий довод (Lerp)
-    cameraTarget.x += (targetX - cameraTarget.x) * 4.5f * deltaTime;
-    cameraTarget.y += (targetY - cameraTarget.y) * 4.5f * deltaTime;
+// 6. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ИНИЦИАЛИЗАЦИИ И СИНТЕСА ГЕОМЕТРИИ DX11
+void CreateRenderTarget() {
+    ID3D11Texture2D* pBackBuffer = nullptr;
+    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
+    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
+    pBackBuffer->Release();
 }
 
-// Перевод пикселей в нормализованные экранные координаты DX11 (-1.0 до 1.0)
+void CleanupRenderTarget() {
+    if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
+}
+
 ScreenPoint PixelsToNDC(float x, float y, float width, float height) {
     return { (x / width) * 2.0f - 1.0f, (1.0f - (y / height) * 2.0f) };
 }
 
-// Генерация кругов/полигонов в буфер вершин
 void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments = 12) {
     for (int i = 0; i < segments; ++i) {
-        float a1 = (i / (float)segments) * 6.28318f;
-        float a2 = ((i + 1) / (float)segments) * 6.28318f;
+        float a1 = (i / static_cast<float>(segments)) * 6.2831853f;
+        float a2 = ((i + 1) / static_cast<float>(segments)) * 6.2831853f;
+        
         ScreenPoint p0 = PixelsToNDC(cx, cy, width, height);
         ScreenPoint p1 = PixelsToNDC(cx + std::cos(a1) * r, cy + std::sin(a1) * r, width, height);
         ScreenPoint p2 = PixelsToNDC(cx + std::cos(a2) * r, cy + std::sin(a2) * r, width, height);
+        
         buffer.push_back({p0.x, p0.y, 0.0f, col.r, col.g, col.b, col.a});
         buffer.push_back({p1.x, p1.y, 0.0f, col.r, col.g, col.b, col.a});
         buffer.push_back({p2.x, p2.y, 0.0f, col.r, col.g, col.b, col.a});
     }
 }
 
-// ============================================================================
-// 4. СИСТЕМА ОБРАБОТКИ ВВОДА (WASD С КОЛЛИЗИЯМИ)
-// ============================================================================
+// Полноценная обработка ввода WASD и мыши в реальном времени
 void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     Vector3D moveDir = { 0.0f, 0.0f, 0.0f };
     if (GetAsyncKeyState('W') & 0x8000) { moveDir.x += 1.0f; moveDir.y -= 1.0f; }
@@ -207,23 +239,30 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     if (len > 0.0f) {
         float nextX = playerPos.x + (moveDir.x / len) * playerSpeed * deltaTime;
         float nextY = playerPos.y + (moveDir.y / len) * playerSpeed * deltaTime;
+        
         float playerRadius = (playerMode == UnitMode::Titan) ? 0.55f : 0.25f;
 
-        // Скольжение вдоль стен за счет раздельной проверки осей
+        // Скольжение вдоль стен
         if (!CheckWorldCollision(nextX, playerPos.y, playerRadius)) playerPos.x = nextX;
         if (!CheckWorldCollision(playerPos.x, nextY, playerRadius)) playerPos.y = nextY;
     }
 
-    POINT mp; GetCursorPos(&mp); ScreenToClient(hwnd, &mp);
-    currentMouseScreenPos = { (float)mp.x, (float)mp.y };
+    POINT mp; 
+    GetCursorPos(&mp); 
+    ScreenToClient(hwnd, &mp);
+    currentMouseScreenPos = { static_cast<float>(mp.x), static_cast<float>(mp.y) };
     mouseWorldPos = isoCamera.ScreenToWorldGround(currentMouseScreenPos, cameraTarget);
 
     if (fireCooldown > 0.0f) fireCooldown -= deltaTime;
 
     if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) && fireCooldown <= 0.0f) {
-        Bullet b; b.start = playerPos; b.current = playerPos;
-        float dx = mouseWorldPos.x - playerPos.x; float dy = mouseWorldPos.y - playerPos.y;
-        float dLen = std::sqrt(dx*dx + dy*dy);
+        Bullet b; 
+        b.start = playerPos; 
+        b.current = playerPos;
+        float dx = mouseWorldPos.x - playerPos.x; 
+        float dy = mouseWorldPos.y - playerPos.y;
+        float dLen = std::sqrt(dx * dx + dy * dy);
+        
         if (dLen > 0.05f) {
             b.direction = { dx / dLen, dy / dLen, 0.0f };
             bullets.push_back(b);
@@ -232,97 +271,44 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     }
 }
 
-// Системный Win32 ресайз Render Target
-void CreateRenderTarget() {
-    ID3D11Texture2D* pBackBuffer; g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView); 
-    pBackBuffer->Release();
-}
-
-void CleanupRenderTarget() {
-    ID3D11Texture2D* pBackBuffer;
-    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
-    if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
-}
-
-// Win32 обработчик событий окна
-// Форвард-декларация обработчика сообщений (если потребуется в будущем)
-// extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-// Win32 оконная процедура для обработки системных событий
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-        case WM_SIZE:
-            if (g_pd3dDevice != nullptr && wParam != SIZE_MINIMIZED) {
-                CleanupRenderTarget();
-                g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
-                CreateRenderTarget();
-            }
-            return 0;
-        case WM_SYSCOMMAND:
-            if ((wParam & 0xFFF0) == SC_KEYMENU) return 0; // Блокируем вызов системного меню по ALT
-            break;
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-        case WM_KEYDOWN:
-            if (wParam == 'E') {
-                // Из лора репозитория: синхронизация со стейтом меха BT-72 или Скаута
-                if (playerMode == UnitMode::Scout) {
-                    playerMode = UnitMode::Titan; playerMaxHealth = 600.0f; playerHealth = 600.0f; playerSpeed = 3.2f;
-                } else {
-                    playerMode = UnitMode::Scout; playerMaxHealth = 100.0f; playerHealth = 100.0f; playerSpeed = 6.5f;
-                }
-            }
-            break;
+// Кинематографическая экшен-камера (Динамическое смещение к прицелу мыши)
+void UpdateHelldiversCamera(float deltaTime) {
+    // Камера смещается в сторону 3D-прицела мыши на 30% для обзора поля боя
+    float targetX = playerPos.x + (mouseWorldPos.x - playerPos.x) * 0.3f;
+    float targetY = playerPos.y + (mouseWorldPos.y - playerPos.y) * 0.3f;
+    
+    // Ограничение максимального удаления камеры от Скаута
+    float maxDist = 4.5f;
+    float dx = targetX - playerPos.x;
+    float dy = targetY - playerPos.y;
+    float currentDist = std::sqrt(dx * dx + dy * dy);
+    
+    if (currentDist > maxDist) {
+        targetX = playerPos.x + (dx / currentDist) * maxDist;
+        targetY = playerPos.y + (dy / currentDist) * maxDist;
     }
-    return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-// Перевод экранных пикселей в нормализованные координаты DX11 (-1.0 до 1.0)
-// Вспомогательная функция перевода экранных пикселей в нормализованные координаты DX11 NDC (-1.0 до 1.0)
-ScreenPoint PixelsToNDC(float x, float y, float width, float height) {
-    return { (x / width) * 2.0f - 1.0f, (1.0f - (y / height) * 2.0f) };
-}
-
-// Генерация примитивов в буфер вершин
-// Генерация радиальных примитивов/полигонов в буфер вершин
-void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments = 12) {
-    for (int i = 0; i < segments; ++i) {
-        float a1 = (i / (float)segments) * 6.283185f;
-        float a2 = ((i + 1) / (float)segments) * 6.283185f;
-        ScreenPoint p0 = PixelsToNDC(cx, cy, width, height);
-        ScreenPoint p1 = PixelsToNDC(cx + std::cos(a1) * r, cy + std::sin(a1) * r, width, height);
-        ScreenPoint p2 = PixelsToNDC(cx + std::cos(a2) * r, cy + std::sin(a2) * r, width, height);
-        buffer.push_back({p0.x, p0.y, 0.0f, col.r, col.g, col.b, col.a});
-        buffer.push_back({p1.x, p1.y, 0.0f, col.r, col.g, col.b, col.a});
-        buffer.push_back({p2.x, p2.y, 0.0f, col.r, col.g, col.b, col.a});
-    }
+    
+    // Плавное Lerp-сглаживание следования камеры
+    cameraTarget.x += (targetX - cameraTarget.x) * 4.5f * deltaTime;
+    cameraTarget.y += (targetY - cameraTarget.y) * 4.5f * deltaTime;
 }
 
 // Тактический Win32-ввод в реальном времени с расчетом скольжения вдоль стен секторов
 void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     Vector3D moveDir = { 0.0f, 0.0f, 0.0f };
-    
-    // Считываем Win32 асинхронный ввод клавиш WASD
     if (GetAsyncKeyState('W') & 0x8000) { moveDir.x += 1.0f; moveDir.y -= 1.0f; }
     if (GetAsyncKeyState('S') & 0x8000) { moveDir.x -= 1.0f; moveDir.y += 1.0f; }
     if (GetAsyncKeyState('A') & 0x8000) { moveDir.x -= 1.0f; moveDir.y -= 1.0f; }
     if (GetAsyncKeyState('D') & 0x8000) { moveDir.x += 1.0f; moveDir.y += 1.0f; }
 
-    // Задаем радиус хитбокса из лора: Скаут — 0.25м, Мех BT-72 — 0.55м
-    // Расчет вектора перемещения с учетом коллизий (Стены Убежища 17)
     float len = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
     if (len > 0.0f) {
         float nextX = playerPos.x + (moveDir.x / len) * playerSpeed * deltaTime;
         float nextY = playerPos.y + (moveDir.y / len) * playerSpeed * deltaTime;
         
-        // Задаем радиус хитбокса из лора: Скаут — 0.25м, Мех BT-72 — 0.55м
-        // Радиус физической коллизии: Скаут — 0.25м, Мех BT-72 — 0.55м
+        // Считываем радиус физической коллизии: Скаут — 0.25м, Мех BT-72 — 0.55м
         float playerRadius = (playerMode == UnitMode::Titan) ? 0.55f : 0.25f;
 
-        // Поочередная проверка осей позволяет плавно скользить вдоль стен, а не залипать в углах
         // Поочередная проверка осей гарантирует плавное скольжение без залипания в углах
         if (!CheckWorldCollision(nextX, playerPos.y, playerRadius)) playerPos.x = nextX;
         if (!CheckWorldCollision(playerPos.x, nextY, playerRadius)) playerPos.y = nextY;
@@ -335,19 +321,13 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     currentMouseScreenPos = { (float)mp.x, (float)mp.y };
     mouseWorldPos = isoCamera.ScreenToWorldGround(currentMouseScreenPos, cameraTarget);
 
-        // Логика кулдауна ведения огня
-    if (fireCooldown > 0.0f) {
-        fireCooldown -= deltaTime;
-    }
-
-    if (fireCooldown > 0.0f){fireCooldown -= deltaTime;}
+    if (fireCooldown > 0.0f) fireCooldown -= deltaTime;
 
     // Ведение реального огня по зажатию ЛКМ Windows
     if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) && fireCooldown <= 0.0f) {
         Bullet b; 
         b.start = playerPos; 
         b.current = playerPos;
-
         float dx = mouseWorldPos.x - playerPos.x; 
         float dy = mouseWorldPos.y - playerPos.y;
         float dLen = std::sqrt(dx * dx + dy * dy);
@@ -355,7 +335,7 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
         if (dLen > 0.05f) {
             b.direction = { dx / dLen, dy / dLen, 0.0f };
             bullets.push_back(b);
-            // Скорострельность автоматической пушки BT-72 выше карабина Скаута
+            // Автоматическая пушка BT-72 стреляет очередью, винтовка Скаута — одиночными
             fireCooldown = (playerMode == UnitMode::Titan) ? 0.08f : 0.25f;
         }
     }
@@ -366,7 +346,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Регистрация класса окна
     WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, hInstance, nullptr, nullptr, nullptr, nullptr, L"PureIsoDX11", nullptr };
     RegisterClassExW(&wc);
-    HWND hwnd = CreateWindowW(L"PureIsoDX11", L"Grimdark Engine v1.0 - Pure DirectX 11", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 720, nullptr, nullptr, hInstance, nullptr);
     HWND hwnd = CreateWindowW(L"PureIsoDX11", L"Vault 17 Outpost - Pure DirectX 11 Engine", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 720, nullptr, nullptr, hInstance, nullptr);
 
     // Конфигурация SwapChain под DirectX 11
@@ -384,8 +363,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, nullptr, &g_pd3dDeviceContext);
     CreateRenderTarget();
 
-    // КОМПИЛЯЦИЯ ШЕЙДЕРОВ В СТРОКАХ КОДА
-    ID3DBlob* vsBlob = nullptr; ID3DBlob* psBlob = nullptr;
     // Компиляция встроенного шейдерного кода HLSL "на лету"
     ID3DBlob* vsBlob = nullptr; 
     ID3DBlob* psBlob = nullptr;
@@ -401,13 +378,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
     g_pd3dDevice->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &g_pInputLayout);
-    vsBlob->Release(); psBlob->Release();
     vsBlob->Release(); 
     psBlob->Release();
 
-    // Создаем динамический вершинный буфер под геометрию (Максимум 30 000 вершин на кадр)
-    D3D11_BUFFER_DESC bd = {}; bd.Usage = D3D11_USAGE_DYNAMIC; bd.ByteWidth = sizeof(Vertex) * 30000;
-    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER; bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     // Выделение динамического буфера под геометрию реального времени (До 30 000 вершин на кадр)
     D3D11_BUFFER_DESC bd = {}; 
     bd.Usage = D3D11_USAGE_DYNAMIC; 
@@ -416,9 +389,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     g_pd3dDevice->CreateBuffer(&bd, nullptr, &g_pVertexBuffer);
 
-    ShowWindow(hwnd, nCmdShow); UpdateWindow(hwnd);
-
-    ShowWindow(hwnd, nCmdShow); UpdateWindow(hwnd);
+    ShowWindow(hwnd, nCmdShow); 
+    UpdateWindow(hwnd);
 
     LARGE_INTEGER frequency, t1, t2; 
     QueryPerformanceFrequency(&frequency); 
@@ -441,7 +413,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         float deltaTime = static_cast<float>(t2.QuadPart - t1.QuadPart) / frequency.QuadPart;
         t1 = t2; 
         
-        // Предотвращаем резкие скачки дельты времени при фризах окна
         if (deltaTime > 0.1f) deltaTime = 0.1f;
 
         // Обновляем текущие размеры клиентской области окна Win32
@@ -454,11 +425,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         // ПОТОК ВВОДА И ОБНОВЛЕНИЯ ПОЗИЦИЙ СИСТЕМ
         HandleInput(hwnd, deltaTime, width, height);
 
-        // Плавная интерполяция (Lerp) камеры за игроком в изометрии
-        cameraTarget.x += (playerPos.x - cameraTarget.x) * 5.5f * deltaTime;
-        cameraTarget.y += (playerPos.y - cameraTarget.y) * 5.5f * deltaTime;
+        // Вызов Helldivers-камеры со смещением к прицелу
+        UpdateHelldiversCamera(deltaTime);
 
         // Таймер генерации бесконечного роя жуков
+        // Таймер генерации бесконечного роя жуков (Vermin) за картой
         enemySpawnTimer += deltaTime;
         if (enemySpawnTimer >= 1.2f) {
             Enemy e; 
@@ -478,14 +449,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
             b.distanceTraveled += step;
             
             if (b.distanceTraveled >= b.maxDistance) b.isAlive = false;
-            
+
             // Если пуля влетела в бетонный завал — уничтожаем её
             if (CheckWorldCollision(b.current.x, b.current.y, 0.05f)) {
                 b.isAlive = false;
                 continue;
             }
-
-
+            
+            
             for (auto& e : enemies) {
                 if (!e.isAlive) continue;
                 float dx = e.position.x - b.current.x; 
@@ -515,7 +486,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
                 e.position.x += (vx / dist) * e.speed * deltaTime; 
                 e.position.y += (vy / dist) * e.speed * deltaTime;
             } else {
-                // Прямой укус — наносит урон каждую секунду нахождения жука вплотную
+                // Нанесение урона Скауту или броне Титана в ближнем бою
                 playerHealth -= (playerMode == UnitMode::Titan) ? 8.0f * deltaTime : 25.0f * deltaTime;
                 if (playerHealth < 0.0f) playerHealth = 0.0f;
             }
@@ -545,6 +516,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         }
 
         // 2. Отрисовка роя противников (Красные маркеры опасности)
+        // 2. Отрисовка роя противников (Вермины — Красные маркеры биологической угрозы)
         for (const auto& e : enemies) {
             if (!e.isAlive) continue;
             ScreenPoint sp = isoCamera.WorldToScreen(e.position, cameraTarget);
@@ -552,6 +524,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         }
 
         // 3. Отрисовка лазерных трассеров (Желтые точки снарядов)
+        // 3. Отрисовка роя противников (Красные маркеры опасности)
+        // 3. Отрисовка лазерных трассеров (Желтые точки летящих снарядов)
         for (const auto& b : bullets) {
             if (!b.isAlive) continue;
             ScreenPoint sp = isoCamera.WorldToScreen(b.current, cameraTarget);
@@ -559,16 +533,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         }
 
         // 4. Отрисовка тактического прицела мыши (Стиль Arknights: Endfield)
+        // 4. Отрисовка тактического интерфейса прицела мыши Pip-Pad
         ScreenPoint spMouse = isoCamera.WorldToScreen(mouseWorldPos, cameraTarget);
         PushCircle(vBuffer, spMouse.x, spMouse.y, 11.0f, width, height, {1.0f, 0.7f, 0.0f, 0.5f}, 8);
         PushCircle(vBuffer, spMouse.x, spMouse.y, 3.0f, width, height, {1.0f, 0.7f, 0.0f, 1.0f}, 4);
 
-        // 5. Отрисовка маркера игрока (Скаут-пехотинец или тяжелый Титан)
+
+        // 5. Отрисовка маркера игрока (Скаут-оперативник или тяжелый Титан BT-72)
         ScreenPoint sPlayer = isoCamera.WorldToScreen(playerPos, cameraTarget);
         if (playerMode == UnitMode::Scout) {
             PushCircle(vBuffer, sPlayer.x, sPlayer.y, 9.0f, width, height, {0.18f, 0.85f, 0.4f, 1.0f}, 8);
         } else {
-            // Мех BT-72 рендерится как массивный шестиугольный контур
+            // Мех BT-72 рендерится как массивный контур из 6 сегментов
             PushCircle(vBuffer, sPlayer.x, sPlayer.y, 16.0f, width, height, {0.02f, 0.5f, 0.95f, 1.0f}, 6);
         }
 
@@ -579,7 +555,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         float by = height - 45.0f;
         float healthRatio = playerHealth / playerMaxHealth;
 
-        // Отрисовка подложки бара (Мрачный темно-серый цвет)
+        // Отрисовка подложки бара (Темно-серый цвет)
         ScreenPoint b0 = PixelsToNDC(bx, by, width, height);
         ScreenPoint b1 = PixelsToNDC(bx + barWidth, by + barHeight, width, height);
         vBuffer.push_back({b0.x, b0.y, 0.0f, 0.15f, 0.16f, 0.18f, 1.0f});
@@ -608,7 +584,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         g_pd3dDeviceContext->Unmap(g_pVertexBuffer, 0);
 
         // ФАЗА РЕНДЕРИНГА DIRECTX 11
-        const float clear_color[] = { 0.05f, 0.05f, 0.06f, 1.0f }; // Глубокий темный индустриальный фон
+        const float clear_color[] = { 0.05f, 0.05f, 0.06f, 1.0f }; 
         g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
         g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color);
 
@@ -628,7 +604,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         g_pSwapChain->Present(1, 0); // Синхронизация кадров включена (V-Sync)
     }
 
-    // ДЕИНИЦИАЛИЗАЦИЯ И ОЧИСТКА ВСЕХ СИСТЕМНЫХ КОМПОНЕНТОВ
+    // ДЕИНИЦИАЛИЗАЦИЯ И ОЧИСТКА ВСЕХ СИСТЕМНЫХ КОМПОНЕНТОВ DIRECT3D
     if (g_pVertexBuffer) g_pVertexBuffer->Release(); 
     if (g_pInputLayout) g_pInputLayout->Release();
     if (g_pVertexShader) g_pVertexShader->Release(); 
@@ -641,5 +617,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     DestroyWindow(hwnd); 
     UnregisterClassW(L"PureIsoDX11", hInstance);
+    
     return 0;
 }
+
+
+
