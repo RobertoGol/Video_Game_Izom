@@ -1,7 +1,13 @@
+#include <iostream>
+#include <cmath>
+#include <algorithm>
+
+// Подключаем наш заголовочный файл глобальных систем
 #include "main.hpp"
 
 
 // ИНИЦИАЛИЗАЦИЯ ВСЕХ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ
+// ФИЗИЧЕСКОЕ ВЫДЕЛЕНИЕ ПАМЯТИ ПОД ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
 UnitMode playerMode = UnitMode::Scout;
 Vector3D playerPos = { 5.0f, 5.0f, 0.0f };
 float playerHealth = 100.0f;
@@ -59,12 +65,27 @@ int currentSectorMap[MAP_WIDTH][MAP_HEIGHT] = {
 int wallDurability[MAP_WIDTH][MAP_HEIGHT];
 float etherErosionMap[MAP_WIDTH][MAP_HEIGHT];
 
+// Строковые исходники шейдеров HLSL встроенные в движок
 const char* vertexShaderSrc = R"(
 struct VS_INPUT { float3 pos : POSITION; float4 col : COLOR; };
 struct PS_INPUT { float4 pos : SV_POSITION; float4 col : COLOR; };
+struct VS_INPUT {
+    float3 pos : POSITION;
+    float4 col : COLOR;
+};
+struct PS_INPUT {
+    float4 pos : SV_POSITION;
+    float4 col : COLOR;
+};
 PS_INPUT main(VS_INPUT input) {
     PS_INPUT output; output.pos = float4(input.pos, 1.0f); output.col = input.col; return output;
 };)";
+    PS_INPUT output;
+    output.pos = float4(input.pos, 1.0f);
+    output.col = input.col;
+    return output;
+};
+)";
 
 const char* pixelShaderSrc = R"(
 struct PS_INPUT { float4 pos : SV_POSITION; float4 col : COLOR; };
@@ -99,12 +120,23 @@ void UpdateHelldiversCamera(float deltaTime) {
     cameraTarget.y += (targetY - cameraTarget.y) * 4.5f * deltaTime;
 }
 
+struct PS_INPUT {
+    float4 pos : SV_POSITION;
+    float4 col : COLOR;
+};
+float4 main(PS_INPUT input) : SV_TARGET {
+    return input.col;
+};
+)";
+
+// Логика создания_Render Target
 void CreateRenderTarget() {
     ID3D11Texture2D* pBackBuffer;
     g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
     g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
     pBackBuffer->Release();
 }
+
 
 void CleanupRenderTarget() {
     if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
@@ -137,18 +169,49 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (wParam == 'E') {
                 if (!titan.isPiloted) {
                     float dx = playerPos.x - titan.position.x; float dy = playerPos.y - titan.position.y;
+                    float dx = playerPos.x - titan.position.x;
+                    float dy = playerPos.y - titan.position.y;
                     if (std::sqrt(dx*dx + dy*dy) <= 1.8f) {
                         titan.isPiloted = true; gameClasses.EnterVehicle();
                         playerMode = UnitMode::Titan; playerMaxHealth = gameClasses.currentStats.maxHealth;
                         playerHealth = titan.health; playerSpeed = gameClasses.currentStats.moveSpeed;
+                        titan.isPiloted = true;
+                        gameClasses.EnterVehicle();
+                        playerMode = UnitMode::Titan;
+                        playerMaxHealth = gameClasses.currentStats.maxHealth;
+                        playerHealth = titan.health;
+                        playerSpeed = gameClasses.currentStats.moveSpeed;
                     }
                 } else {
                     titan.isPiloted = false; titan.health = playerHealth; gameClasses.ExitVehicle();
                     playerMode = UnitMode::Scout; playerMaxHealth = gameClasses.currentStats.maxHealth;
                     playerHealth = 100.0f; playerSpeed = gameClasses.currentStats.moveSpeed;
+                    titan.isPiloted = false;
+                    titan.health = playerHealth;
+                    gameClasses.ExitVehicle();
+                    playerMode = UnitMode::Scout;
+                    playerMaxHealth = gameClasses.currentStats.maxHealth;
+                    playerHealth = 100.0f;
+                    playerSpeed = gameClasses.currentStats.moveSpeed;
                     playerPos.x = titan.position.x + 1.0f;
                 }
             }
+        }
+            if (wParam == VK_TAB) {
+                if (titan.isPiloted) {
+                    if (titan.currentWeapon == TankWeaponMode::Cannon) {
+                        titan.currentWeapon = TankWeaponMode::AutoCannon;
+                    } else {
+                        titan.currentWeapon = TankWeaponMode::Cannon;
+                    }
+                }
+            }
+        }
+            if (wParam == 'Q') {
+                gameClasses.ActivateTacticalSkill();
+                if (gameClasses.GetActivePilotClass() == PilotClass::Stim && !titan.isPiloted) {
+                    playerHealth = std::min(playerMaxHealth, playerHealth + 30.0f);
+                }}
             if (wParam == VK_TAB && titan.isPiloted) {
                 titan.currentWeapon = (titan.currentWeapon == TankWeaponMode::Cannon) ? TankWeaponMode::AutoCannon : TankWeaponMode::Cannon;
             }
@@ -163,8 +226,21 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 if (wParam == '5') gameClasses.ChangeTitanFirmware(TitanClass::Scorch);
                 if (wParam == '6') gameClasses.ChangeTitanFirmware(TitanClass::Northstar);
                 if (wParam == '7') gameClasses.ChangeTitanFirmware(TitanClass::Tone);
+            } else {
+                if (wParam == '1') gameClasses.ChangePilotClass(PilotClass::Grapple);
+                if (wParam == '2') gameClasses.ChangePilotClass(PilotClass::Cloak);
+                if (wParam == '3') gameClasses.ChangePilotClass(PilotClass::Stim);
             }
             break;
+        case WM_MOUSEWHEEL:
+            if (playerMode == UnitMode::Titan && (GetAsyncKeyState(VK_RBUTTON) & 0x8000)) {
+                short zDelta = (short)HIWORD(wParam);
+                if (zDelta > 0) isoCamera.zoom += 4.0f;
+                else isoCamera.zoom -= 4.0f;
+                if (isoCamera.zoom < 30.0f) isoCamera.zoom = 30.0f;
+                if (isoCamera.zoom > 90.0f) isoCamera.zoom = 90.0f;
+            }
+            return 0;
     }
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
@@ -174,8 +250,11 @@ ScreenPoint PixelsToNDC(float x, float y, float width, float height) {
 }
 
 void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments) {
+void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments = 12) {
     for (int i = 0; i < segments; ++i) {
         float a1 = (i / (float)segments) * 6.283185f; float a2 = ((i + 1) / (float)segments) * 6.283185f;
+        float a1 = (i / (float)segments) * 6.283185f;
+        float a2 = ((i + 1) / (float)segments) * 6.283185f;
         ScreenPoint p0 = PixelsToNDC(cx, cy, width, height);
         ScreenPoint p1 = PixelsToNDC(cx + std::cos(a1) * r, cy + std::sin(a1) * r, width, height);
         ScreenPoint p2 = PixelsToNDC(cx + std::cos(a2) * r, cy + std::sin(a2) * r, width, height);
@@ -183,6 +262,37 @@ void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float 
         buffer.push_back({p1.x, p1.y, 0.0f, col.r, col.g, col.b, col.a});
         buffer.push_back({p2.x, p2.y, 0.0f, col.r, col.g, col.b, col.a});
     }
+}
+
+bool CheckWorldCollision(float nextX, float nextY, float radius) {
+    int checkPoints[4][2] = {
+        { (int)(nextX - radius), (int)(nextY - radius) },
+        { (int)(nextX + radius), (int)(nextY - radius) },
+        { (int)(nextX - radius), (int)(nextY + radius) },
+        { (int)(nextX + radius), (int)(nextY + radius) }
+    };
+    for (int i = 0; i < 4; ++i) {
+        int tx = checkPoints[i][0];
+        int ty = checkPoints[i][1];
+        if (tx < 0 || tx >= MAP_WIDTH || ty < 0 || ty >= MAP_HEIGHT) return true;
+        if (currentSectorMap[tx][ty] == 1) return true;
+    }
+    return false;
+}
+
+void UpdateHelldiversCamera(float deltaTime) {
+    float targetX = playerPos.x + (mouseWorldPos.x - playerPos.x) * 0.3f;
+    float targetY = playerPos.y + (mouseWorldPos.y - playerPos.y) * 0.3f;
+    float maxDist = 4.5f;
+    float dx = targetX - playerPos.x;
+    float dy = targetY - playerPos.y;
+    float currentDist = std::sqrt(dx * dx + dy * dy);
+    if (currentDist > maxDist) {
+        targetX = playerPos.x + (dx / currentDist) * maxDist;
+        targetY = playerPos.y + (dy / currentDist) * maxDist;
+    }
+    cameraTarget.x += (targetX - cameraTarget.x) * 4.5f * deltaTime;
+    cameraTarget.y += (targetY - cameraTarget.y) * 4.5f * deltaTime;
 }
 
 void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
@@ -193,8 +303,10 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     if (GetAsyncKeyState('D') & 0x8000) { moveDir.x += 1.0f; moveDir.y += 1.0f; }
 
     isAiming = (GetAsyncKeyState(VK_RBUTTON) & 0x8000);
+
     if (playerMode == UnitMode::Scout || !isAiming) {
         isoCamera.zoom += (baseZoom - isoCamera.zoom) * 5.0f * deltaTime;
+        isoCamera.zoom += (55.0f - isoCamera.zoom) * 5.0f * deltaTime;
     }
 
     float len = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
@@ -202,6 +314,12 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
         float currentMoveSpeed = playerSpeed;
         if (playerMode == UnitMode::Scout && isAiming) currentMoveSpeed *= 0.63f;
         if (playerMode == UnitMode::Titan && titan.systems.tracksCondition < 40.0f) currentMoveSpeed *= 0.3f;
+        if (playerMode == UnitMode::Scout && isAiming) {
+            currentMoveSpeed *= 0.63f;
+        }
+        if (playerMode == UnitMode::Titan && titan.systems.tracksCondition < 40.0f) {
+            currentMoveSpeed *= 0.3f;
+        }
 
         float nextX = playerPos.x + (moveDir.x / len) * currentMoveSpeed * deltaTime;
         float nextY = playerPos.y + (moveDir.y / len) * currentMoveSpeed * deltaTime;
@@ -216,7 +334,6 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
     mouseWorldPos = isoCamera.ScreenToWorldGround(currentMouseScreenPos, cameraTarget);
 
     if (fireCooldown > 0.0f) fireCooldown -= deltaTime;
-
     // Расчет вектора направления наведения на цель
     float dx = mouseWorldPos.x - playerPos.x;
     float dy = mouseWorldPos.y - playerPos.y;
@@ -224,16 +341,12 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
 
     if (dLen > 0.05f && fireCooldown <= 0.0f) {
         Vector3D normDir = { dx / dLen, dy / dLen, 0.0f };
-
-        // --------------------------------------------------------------------
         // ОГНЕВЫЕ РЕЖИМЫ КЛАССА: СКАУТ-ОПЕРАТИВНИК
         // --------------------------------------------------------------------
         if (playerMode == UnitMode::Scout) {
-            // ЛКМ: Одиночный точный карабин или Дробовик кучным пучком (Если нажат ПКМ)
             if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
                 if (isAiming) {
-                    // Режим Дробовика: Вылетает 5 дробин кучным пучком строго в одном направлении
-                    float pelletSpread = 0.04f; 
+                    float pelletSpread = 0.04f;
                     for (int i = 0; i < 5; ++i) {
                         Bullet p; p.start = playerPos; p.current = playerPos; p.type = BulletType::Pellet;
                         float randomSpread = ((rand() % 100) / 100.0f - 0.5f) * pelletSpread;
@@ -249,21 +362,15 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
                 }
             }
         }
-        // --------------------------------------------------------------------
-        // ОГНЕВЫЕ РЕЖИМЫ КЛАССА: УПРАВЛЯЕМЫЙ ТАНК С ИИ
-        // --------------------------------------------------------------------
         else if (playerMode == UnitMode::Titan) {
-            // Если Вермины повредили турель Танка — разброс пушки резко возрастает
             if (titan.systems.turretStatus < 50.0f) {
                 float brokenFactor = ((rand() % 100) / 100.0f - 0.5f) * 0.25f;
                 normDir.x += brokenFactor; normDir.y += brokenFactor;
             }
 
-            // Нажатие на СКМ циклически меняет режим залпа ракетного модуля
             if (GetAsyncKeyState(VK_MBUTTON) & 0x8000) {
                 if (titan.hasMissileModule) {
                     if (titan.missileMode == MissileStrikeMode::Ballistic) {
-                        // Режим 1: Залп из 7-8 ракет горизонтальной баллистической стеной
                         for (int i = -3; i <= 3; ++i) {
                             Bullet m; m.start = playerPos; m.current = playerPos;
                             m.type = BulletType::BallisticMissile; m.speed = 15.0f; m.splashRadius = 1.8f;
@@ -279,34 +386,24 @@ void HandleInput(HWND hwnd, float deltaTime, float wWidth, float wHeight) {
                             Bullet m; m.start = playerPos; m.current = playerPos;
                             m.type = BulletType::ArtilleryMissile; m.speed = 10.0f; m.splashRadius = 2.4f;
                             m.targetPos = mouseWorldPos; 
+                            Bullet m; 
+                            m.start = playerPos; 
+                            m.current = playerPos;
+                            m.type = BulletType::ArtilleryMissile; 
+                            m.speed = 10.0f; 
+                            m.splashRadius = 2.4f;
+                            m.targetPos = mouseWorldPos; // Точка падения — позиция курсора мыши
+                            // Случайный разброс падения ракет в артиллерийском круге
                             m.targetPos.x += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
                             m.targetPos.y += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
                             bullets.push_back(m);
                         }
                     }
-                    // Переключаем режим на СКМ
+                    // Переключаем режим на следующий для последующего клика СКМ
                     titan.missileMode = (titan.missileMode == MissileStrikeMode::Ballistic) ? MissileStrikeMode::Artillery : MissileStrikeMode::Ballistic;
-                    fireCooldown = 1.8f; 
+                    fireCooldown = 1.8f; // Перезарядка ракетных шахт
                 }
             }
-
-            // Нажатие ЛКМ активирует выбранный на Tab ствол Танка
-            if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
-                if (titan.currentWeapon == TankWeaponMode::Cannon) {
-                    // Режим 1: Одиночный залп пушки
-                    Bullet b; b.start = playerPos; b.current = playerPos; b.direction = normDir;
-                    b.type = BulletType::Standard; b.speed = 25.0f; bullets.push_back(b);
-                    fireCooldown = 0.4f;
-                } else {
-                    // Режим 2: Скорострельная автоматическая пушка-автомат
-                    Bullet b; b.start = playerPos; b.current = playerPos; b.direction = normDir;
-                    b.type = BulletType::Standard; b.speed = 34.0f; bullets.push_back(b);
-                    fireCooldown = (titan.systems.turretStatus < 50.0f) ? 0.18f : 0.07f;
-                }
-            }
-        }
-    }
-}
 
 // Нативная точка входа приложения Windows
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
@@ -806,5 +903,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     return 0;
 }
-
-
