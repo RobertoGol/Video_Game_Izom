@@ -4,7 +4,7 @@
 void RenderUIEffects(std::vector<Vertex>& vBuffer, float width, float height) {
     float barWidth = 280.0f;
     float barHeight = 12.0f;
-    
+
     // Шкала Эфирной Эрозии (В нижнем правом углу)
     float bx2 = width - barWidth - 45.0f;
     float by2 = height - 45.0f;

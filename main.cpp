@@ -336,6 +336,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
             vBuffer.push_back({ e1.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
             vBuffer.push_back({ erBg0.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
         }
+        // ИСПРАВЛЕНО: Рендеринг шкал и биометрии HUD через новые изолированные модули
+        RenderTacticalHUD(vBuffer, width, height); // Вызов из Data/HUD/HUD.cpp
+        RenderUIEffects(vBuffer, width, height);   // Вызов из Data/HUD/UIEffects.cpp
+
+        // ЗАГРУЗКА И СИНХРОНИЗАЦИЯ СГЕНЕРИРОВАННОЙ ГЕОМЕТРИИ В ВИДЕОПАМЯТЬ
+        D3D11_MAPPED_SUBRESOURCE ms;
+        g_pd3dDeviceContext->Map(g_pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);
 
         // ЗАГРУЗКА И СИНХРОНИЗАЦИЯ СГЕНЕРИРОВАННОЙ ГЕОМЕТРИИ В ВИДЕОПАМЯТЬ
         D3D11_MAPPED_SUBRESOURCE ms;

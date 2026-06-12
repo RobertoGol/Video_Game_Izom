@@ -30,7 +30,7 @@ void RenderTacticalHUD(std::vector<Vertex>& vBuffer, float width, float height) 
         vBuffer.push_back({ hpBg0.x, h1.y, 0.0f, hCol.r, hCol.g, hCol.b, hCol.a });
     }
 
-    // Индикаторы состояния повреждения узлов Танка с ИИ на HUD в левом углу
+    // Инфикаторы состояния повреждения узлов Танка с ИИ на HUD в левом углу
     if (playerMode == UnitMode::Titan) {
         float indicatorY = (height - 45.0f) - 30.0f;
         Vertex tracksCol = (titan.systems.tracksCondition > 40.0f) ? Vertex{0.2f, 0.8f, 0.2f, 1.0f} : Vertex{0.9f, 0.2f, 0.2f, 1.0f};
