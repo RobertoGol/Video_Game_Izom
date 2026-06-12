@@ -336,6 +336,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
             vBuffer.push_back({ e1.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
             vBuffer.push_back({ erBg0.x, e1.y, 0.0f, eCol.r, eCol.g, eCol.b, eCol.a });
         }
+
+         // Обновляем таймеры невидимости / фазы / стима каждый кадр
+        gameClasses.UpdateCooldowns(deltaTime);
+        
+        // ИСПРАВЛЕНО: Интеграция физического движка Крюка-кошки из Tactics.cpp
+        if (gameClasses.isTacticalActive && gameClasses.GetActivePilotClass() == PilotClass::Grapple) {
+            gameClasses.ProcessGrapplePhysics(playerPos, deltaTime);
+        } else {
+            // Если на кошке не летим — скорость ходьбы Скаута определяется классом
+            if (!titan.isPiloted) {
+                playerSpeed = gameClasses.currentStats.moveSpeed;
+            }
+        }
+
+        HandleInput(hwnd, deltaTime, width, height);
+
         // ИСПРАВЛЕНО: Рендеринг шкал и биометрии HUD через новые изолированные модули
         RenderTacticalHUD(vBuffer, width, height); // Вызов из Data/HUD/HUD.cpp
         RenderUIEffects(vBuffer, width, height);   // Вызов из Data/HUD/UIEffects.cpp
