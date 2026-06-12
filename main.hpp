@@ -1,6 +1,6 @@
 #pragma once
 #ifndef NOMINMAX
-#define NOMINMAX
+#define NOMINMAX // Защита от конфликта макросов min/max в Windows.h
 #endif
 
 #define WIN32_LEAN_AND_MEAN
@@ -11,19 +11,21 @@
 #include <string>
 #include <algorithm>
 
-// ИСПРАВЛЕНО: Подключение строго по путям твоих вложенных папок
+// Подключение объявлений строго по путям твоих вложенных папок
 #include "Data/Types.hpp"
 #include "Data/Physics/Tactics.hpp"
-#include "Data/Map.cpp" // Для доступа к константам разметки, если требуется
+#include "Data/Map.hpp"
 #include "Data/bodies/Enemies.hpp"
 #include "Data/Physics/Mechanics.hpp"
 #include "Data/Player/Player.hpp"
 #include "Data/HUD/HUD.hpp"
 #include "Data/HUD/UIEffects.hpp"
+#include "Data/Physics/Tank.hpp"
+#include "Data/Camera.hpp"
+#include "Data/Renderer.hpp"
 
-// Forward declarations системных функций для оконного цикла
+// Forward declarations системных функций
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-void UpdateHelldiversCamera(float deltaTime);
 
 // ОБЪЯВЛЕНИЕ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ (extern связывает модули через линкер)
 extern UnitMode playerMode;
@@ -61,13 +63,7 @@ extern ID3D11PixelShader*      g_pPixelShader;
 extern ID3D11InputLayout*      g_pInputLayout;
 extern ID3D11Buffer*           g_pVertexBuffer;
 
-// СЕТКА КАРТЫ СЕКТОРОВ УБЕЖИЩА 17
+// СЕТКА КАРТЫ СЕКТОРОВ УБЕЖИЩА 17 (Вынесена в extern)
 extern int currentSectorMap[MAP_WIDTH][MAP_HEIGHT];
 extern int wallDurability[MAP_WIDTH][MAP_HEIGHT];
 extern float etherErosionMap[MAP_WIDTH][MAP_HEIGHT];
-
-// Глобальные аппаратные хелперы рендера геометрии
-void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments = 12);
-ScreenPoint PixelsToNDC(float x, float y, float width, float height);
-void CreateRenderTarget();
-void CleanupRenderTarget();
