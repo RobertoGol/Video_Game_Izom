@@ -1,4 +1,4 @@
-#include "Vault17Tactics.hpp"
+#include "Tactics.hpp"
 
 // ============================================================================
 // РЕАЛИЗАЦИЯ МЕТОДОВ КЛАССA Vault17ClassManager
@@ -30,7 +30,7 @@ void Vault17ClassManager::ChangeTitanFirmware(TitanClass newClass) {
 
 void Vault17ClassManager::EnterVehicle() {
     isInsideVehicle = true;
-    isTacticalActive = false;
+    isTacticalActive = false; // Тактики пилота засыпают внутри герметичного Танка
     UpdateActiveStats();
 }
 
@@ -48,7 +48,7 @@ void Vault17ClassManager::UpdateCooldowns(float deltaTime) {
         tacticalActiveTimer -= deltaTime;
         if (tacticalActiveTimer <= 0.0f) {
             isTacticalActive = false;
-            UpdateActiveStats();
+            UpdateActiveStats(); // Сброс боевых баффов тактик после отката
         }
     }
 }
@@ -82,14 +82,14 @@ void Vault17ClassManager::UpdateActiveStats() {
                 currentStats.weaponLabel = isTacticalActive ? L"CLOAK FIELD ACTIVE" : L"STANDARD CARBINE"; break;
             case PilotClass::Stim:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = isTacticalActive ? 9.5f : 5.5f; 
-                currentStats.weaponLabel = L"STIMULANT LOADED CARBINE"; break;
+                currentStats.weaponLabel = L"STIMULANT INJECTED CARBINE"; break;
             case PilotClass::PhaseShift:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.5f;
-                currentStats.erosionResistance = isTacticalActive ? 1.0f : 0.0f;
+                currentStats.erosionResistance = isTacticalActive ? 1.0f : 0.0f; // Во время фазы Скаут неуязвим к Эфиру
                 currentStats.weaponLabel = L"PHASE EXPERIMENTAL RIFLE"; break;
             case PilotClass::AWall:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.3f;
-                currentStats.damageMultiplier = isTacticalActive ? 1.7f : 1.0f; 
+                currentStats.damageMultiplier = isTacticalActive ? 1.7f : 1.0f; // Выстрелы сквозь Э-стену сильнее на 70%
                 currentStats.weaponLabel = L"AMP-TACTICAL CARBINE"; break;
             default:
                 currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.5f;
@@ -97,7 +97,7 @@ void Vault17ClassManager::UpdateActiveStats() {
         }
     } else {
         currentStats.isVehicleMode = true;
-        currentStats.erosionResistance = 1.0f; 
+        currentStats.erosionResistance = 1.0f; // 100% герметичность Танка от Эфирной Эрозии секторов поверхности
 
         switch (activeTitanClass) {
             case TitanClass::Ion:       currentStats.maxHealth = 500.0f; currentStats.moveSpeed = 3.5f; currentStats.weaponLabel = L"ION: SPLITTER RIFLE"; break;
@@ -146,6 +146,7 @@ ScreenPoint IsometricCamera::WorldToScreen(const Vector3D& worldPos, const Vecto
     float relZ = worldPos.z - cameraTarget.z;
 
     ScreenPoint screen;
+    // Изометрический разворот осей в пространстве и сжатие по высоте Z
     screen.x = (relX - relY) * ISO_COS;
     screen.y = (relX + relY) * ISO_SIN - relZ;
 
@@ -159,6 +160,7 @@ Vector3D IsometricCamera::ScreenToWorldGround(const ScreenPoint& screenPos, cons
     float sy = (screenPos.y - centerOffset.y) / zoom;
 
     Vector3D world;
+    // Матричное решение системы уравнений обратной полуизометрической проекции при Z = 0
     world.x = (sx / (2.0f * ISO_COS)) + (sy / (2.0f * ISO_SIN)) + cameraTarget.x;
     world.y = (sy / (2.0f * ISO_SIN)) - (sx / (2.0f * ISO_COS)) + cameraTarget.y;
     world.z = 0.0f;

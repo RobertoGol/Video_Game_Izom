@@ -1,5 +1,6 @@
 #include "main.hpp"
 
+
 // ИНИЦИАЛИЗАЦИЯ ВСЕХ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ
 UnitMode playerMode = UnitMode::Scout;
 Vector3D playerPos = { 5.0f, 5.0f, 0.0f };

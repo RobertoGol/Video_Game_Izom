@@ -8,7 +8,7 @@
 #include <algorithm>
 
 // Подключаем наш тактический заголовок
-#include "Vault17Tactics.hpp"
+#include "Tactics.hpp"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
