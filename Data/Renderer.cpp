@@ -1,22 +1,63 @@
-#include "../main.hpp"
 #include "Renderer.hpp"
+#include "../main.hpp"
 #include <cmath>
+#include <algorithm>
 
-ScreenPoint PixelsToNDC(float x, float y, float width, float height) {
-    return { (x / width) * 2.0f - 1.0f, (1.0f - (y / height) * 2.0f) };
+namespace bunker {
+
+// --- РЕТРО АНИМАЦИОННЫЙ СТЕК СПРАЙТШИТОВ (DirectX 11 NDC) ---
+
+struct SpriteAnimFrame {
+    float uMin, vMin, uMax, vMax;
+};
+
+// Генерация 4-х вершин текстурированного квада (2 треугольника) с расчетом 8 ракурсов
+void PushAnimatedSpriteSheet(std::vector<Vertex>& buffer, float worldX, float worldY, float spriteWidth, float spriteHeight,
+                             float facingAngleDegrees, int currentFrameIdx, int totalFramesInRow, int textureWidth, int textureHeight)
+{
+    // 1. Конвертируем чистый угол 360° в один из 8 изометрических рядов спрайтшита (0 - 7)
+    // Ряды в атласе: 0=Юг, 1=Юго-Запад, 2=Запад, 3=Северо-Запад, 4=Север, 5=Северо-Восток, 6=Восток, 7=Юго-Восток
+    int directionRow = 0;
+    float normalizedAngle = fmod(facingAngleDegrees + 22.5f, 360.0f);
+    if (normalizedAngle < 0.0f) normalizedAngle += 360.0f;
+    directionRow = static_cast<int>(normalizedAngle / 45.0f);
+
+    // Маппинг рядов под каноничный разворот изометрической сетки вашего движка
+    int isoRowMapping[] = { 6, 5, 4, 3, 2, 1, 0, 7 };
+    int targetRow = isoRowMapping[directionRow];
+
+    // 2. Шаг нарезки сетки атласа по пикселям
+    float frameWidthTexel = static_cast<float>(textureWidth) / static_cast<float>(totalFramesInRow);
+    float frameHeightTexel = static_cast<float>(textureHeight) / 8.0f; // 8 рядов направлений
+
+    // Расчет UV координат сдвига кадра для шейдера RetroShader.hpp
+    float uMin = (static_cast<float>(currentFrameIdx) * frameWidthTexel) / static_cast<float>(textureWidth);
+    float uMax = uMin + (frameWidthTexel / static_cast<float>(textureWidth));
+    float vMin = (static_cast<float>(targetRow) * frameHeightTexel) / static_cast<float>(textureHeight);
+    float vMax = vMin + (frameHeightTexel / static_cast<float>(textureHeight));
+
+    // 3. Перевод мировых координат в экранные изометрические пиксели через камеру
+    Vector3D worldPos = { worldX, worldY, 0.0f };
+    ScreenPoint screenCenter = isoCamera.WorldToScreen(worldPos, cameraTarget);
+
+    // Строим геометрию пиксель-арт спрайта вокруг центра точки опоры (Pivot Point)
+    float halfW = spriteWidth * 0.5f;
+    float topY = screenCenter.y - spriteHeight; // Точка опоры спрайта — ноги персонажа
+    
+    ScreenPoint topLeft  = PixelsToNDC(screenCenter.x - halfW, topY, 1280.0f, 720.0f);
+    ScreenPoint topRight = ToNDC(screenCenter.x + halfW, topY);
+    ScreenPoint botLeft  = ToNDC(screenCenter.x - halfW, screenCenter.y);
+    ScreenPoint botRight = ToNDC(screenCenter.x + halfW, screenCenter.y);
+
+    // Запись геометрии биллборда в вершинный буфер видеокарты (Текстурные UV подмешиваются в R,G каналы для кастомного шейдера)
+    buffer.push_back({ topLeft.x,  topLeft.y,  0.0f, uMin, vMin, 1.0f, 1.0f });
+    buffer.push_back({ topRight.x, topRight.y, 0.0f, uMax, vMin, 1.0f, 1.0f });
+    buffer.push_back({ botLeft.x,  botLeft.y,  0.0f, uMin, vMax, 1.0f, 1.0f });
+
+    buffer.push_back({ botLeft.x,  botLeft.y,  0.0f, uMin, vMax, 1.0f, 1.0f });
+    buffer.push_back({ topRight.x, topRight.y, 0.0f, uMax, vMin, 1.0f, 1.0f });
+    buffer.push_back({ botRight.x, botRight.y, 0.0f, uMax, vMax, 1.0f, 1.0f });
 }
 
-void PushCircle(std::vector<Vertex>& buffer, float cx, float cy, float r, float width, float height, Vertex col, int segments) {
-    for (int i = 0; i < segments; ++i) {
-        float a1 = (i / (float)segments) * 6.2831853f;
-        float a2 = ((i + 1) / (float)segments) * 6.2831853f;
-        
-        ScreenPoint p0 = PixelsToNDC(cx, cy, width, height);
-        ScreenPoint p1 = PixelsToNDC(cx + std::cos(a1) * r, cy + std::sin(a1) * r, width, height);
-        ScreenPoint p2 = PixelsToNDC(cx + std::cos(a2) * r, cy + std::sin(a2) * r, width, height);
-        
-        buffer.push_back({p0.x, p0.y, 0.0f, col.r, col.g, col.b, col.a});
-        buffer.push_back({p1.x, p1.y, 0.0f, col.r, col.g, col.b, col.a});
-        buffer.push_back({p2.x, p2.y, 0.0f, col.r, col.g, col.b, col.a});
-    }
-}
+// ... Ваши прошлые функции InitializeRendererTables и PushCircle остаются без изменений ниже
+} // namespace bunker

@@ -1,0 +1,7 @@
+type=StaticBase
+name=🚨 ОПОРНАЯ ПЛИТА МИШЕНИ v15
+health=9999.0
+speed=0.0
+radius=0.50
+score=0
+faction=Training

@@ -1,0 +1,10 @@
+^D:\PROJECTS\IZOM_GAME_PROJECT\BUILD\CMAKEFILES\36993986D1DAE08EE19BE5DA2C719E0E\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/Projects/Izom_Game_Project -BD:/Projects/Izom_Game_Project/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file D:/Projects/Izom_Game_Project/build/BunkerProtocolEngine.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

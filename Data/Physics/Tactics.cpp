@@ -1,8 +1,12 @@
-#include "../../main.hpp"
 #include "Tactics.hpp"
+#include "../../main.hpp" // Допуск к глобальным playerHealth, bunkerProgression, CheckWorldCollision
 #include <cmath>
+#include <algorithm>
 
-Vault17ClassManager::Vault17ClassManager() {
+namespace bunker {
+
+Vault17ClassManager::Vault17ClassManager() 
+{
     activePilotClass = PilotClass::Grapple;
     activeTitanClass = TitanClass::Tone;
     isInsideVehicle = false;
@@ -12,7 +16,7 @@ Vault17ClassManager::Vault17ClassManager() {
     
     grapple.isAttached = false;
     grapple.length = 0.0f;
-    grapple.velocity = {0.0f, 0.0f, 0.0f};
+    grapple.velocity = { 0.0f, 0.0f, 0.0f };
     
     aWallShield.isDeployed = false;
     isPulseBladeActive = false;
@@ -22,8 +26,10 @@ Vault17ClassManager::Vault17ClassManager() {
     UpdateActiveStats();
 }
 
-void Vault17ClassManager::ChangePilotClass(PilotClass newClass) {
-    if (!isInsideVehicle) {
+void Vault17ClassManager::ChangePilotClass(PilotClass newClass) 
+{
+    if (!isInsideVehicle) 
+    {
         activePilotClass = newClass;
         isTacticalActive = false;
         tacticalActiveTimer = 0.0f;
@@ -35,12 +41,14 @@ void Vault17ClassManager::ChangePilotClass(PilotClass newClass) {
     }
 }
 
-void Vault17ClassManager::ChangeTitanFirmware(TitanClass newClass) {
+void Vault17ClassManager::ChangeTitanFirmware(TitanClass newClass) 
+{
     activeTitanClass = newClass;
     if (isInsideVehicle) UpdateActiveStats();
 }
 
-void Vault17ClassManager::EnterVehicle() {
+void Vault17ClassManager::EnterVehicle() 
+{
     isInsideVehicle = true;
     isTacticalActive = false;
     grapple.isAttached = false;
@@ -49,7 +57,8 @@ void Vault17ClassManager::EnterVehicle() {
     UpdateActiveStats();
 }
 
-void Vault17ClassManager::ExitVehicle() {
+void Vault17ClassManager::ExitVehicle() 
+{
     isInsideVehicle = false;
     UpdateActiveStats();
 }
@@ -57,44 +66,55 @@ void Vault17ClassManager::ExitVehicle() {
 PilotClass Vault17ClassManager::GetActivePilotClass() const { return activePilotClass; }
 TitanClass Vault17ClassManager::GetActiveTitanClass() const { return activeTitanClass; }
 
-void Vault17ClassManager::UpdateCooldowns(float deltaTime) {
+void Vault17ClassManager::UpdateCooldowns(float deltaTime) 
+{
     if (tacticalCooldown > 0.0f) tacticalCooldown -= deltaTime;
     
-    if (isTacticalActive) {
+    if (isTacticalActive) 
+    {
         tacticalActiveTimer -= deltaTime;
-        if (tacticalActiveTimer <= 0.0f) {
+        if (tacticalActiveTimer <= 0.0f) 
+        {
             isTacticalActive = false;
             aWallShield.isDeployed = false;
             isPulseBladeActive = false;
-            isPhaseDimensionActive = false; // Возвращаемся из Изнанки в реальный мир
+            isPhaseDimensionActive = false; // Возвращаемся из Изнанки
             UpdateActiveStats();
         }
     }
     
-    if (isTacticalActive && activePilotClass == PilotClass::Stim && !isInsideVehicle) {
+    // Регенерация здоровья инъекцией Стима
+    if (isTacticalActive && activePilotClass == PilotClass::Stim && !isInsideVehicle) 
+    {
         playerHealth = std::min(playerMaxHealth, playerHealth + 15.0f * deltaTime);
     }
 }
 
-void Vault17ClassManager::ActivateTacticalSkill(const Vector3D& mousePos, const Vector3D& pilotPos) {
-    // Если Pip-Pad еще не найден — тактические умения костюма заблокированы!
+void Vault17ClassManager::ActivateTacticalSkill(const Vector3D& mousePos, const Vector3D& pilotPos) 
+{
+    // Блокировка способностей до нахождения Pip-Pad в сессии Убежища 17
     if (!bunkerProgression.hasFoundPipPad || isInsideVehicle || tacticalCooldown > 0.0f || isTacticalActive) return;
     
     isTacticalActive = true;
     
-    switch (activePilotClass) {
+    switch (activePilotClass) 
+    {
         case PilotClass::Grapple:
             grapple.isAttached = true;
             grapple.hookPoint = mousePos;
             {
                 float dx = grapple.hookPoint.x - pilotPos.x;
                 float dy = grapple.hookPoint.y - pilotPos.y;
-                grapple.length = std::sqrt(dx*dx + dy*dy);
-                if (grapple.length > 12.0f) {
+                
+                // ОПТИМИЗАЦИЯ: Сначала проверяем квадрат макс. длины лебедки (12 клеток = 144.0f)
+                float distSq = dx * dx + dy * dy;
+                if (distSq > 144.0f) 
+                {
                     grapple.isAttached = false;
                     isTacticalActive = false;
                     return;
                 }
+                grapple.length = std::sqrt(distSq); // Извлекаем корень только при успешном зацепе
             }
             tacticalActiveTimer = 2.0f;
             tacticalCooldown = 9.0f;
@@ -106,7 +126,6 @@ void Vault17ClassManager::ActivateTacticalSkill(const Vector3D& mousePos, const 
             break;
 
         case PilotClass::PhaseShift:
-            // КАНOН TITANFALL 2: Проваливаемся в фазовое измерение
             isPhaseDimensionActive = true; 
             tacticalActiveTimer = 2.5f; 
             tacticalCooldown = 18.0f;
@@ -132,52 +151,78 @@ void Vault17ClassManager::ActivateTacticalSkill(const Vector3D& mousePos, const 
     UpdateActiveStats();
 }
 
-void Vault17ClassManager::ProcessGrapplePhysics(Vector3D& pilotPos, float deltaTime) {
+void Vault17ClassManager::ProcessGrapplePhysics(Vector3D& pilotPos, float deltaTime) 
+{
     if (!grapple.isAttached || activePilotClass != PilotClass::Grapple || isInsideVehicle) return;
 
     float tdx = grapple.hookPoint.x - pilotPos.x;
     float tdy = grapple.hookPoint.y - pilotPos.y;
     float currentDist = std::sqrt(tdx * tdx + tdy * tdy);
 
-    if (currentDist > 0.4f && tacticalActiveTimer > 0.05f) {
+    if (currentDist > 0.4f && tacticalActiveTimer > 0.05f) 
+    {
         float pullForce = 8.0f;
         grapple.velocity.x = (tdx / currentDist) * pullForce;
         grapple.velocity.y = (tdy / currentDist) * pullForce;
         
+        // Математическая парабола высоты полета Пилота на тросе по оси Z
         float progress = 1.0f - (currentDist / grapple.length);
         pilotPos.z = std::sin(progress * 3.1415926f) * 1.8f; 
 
-        pilotPos.x += grapple.velocity.x * deltaTime;
-        pilotPos.y += grapple.velocity.y * deltaTime;
-    } else {
+        // ИСПРАВЛЕНИЕ: Интеграция ААВВ-клиппинга стен. Пилот больше не пролетает сквозь геометрию бункера!
+        float nextX = pilotPos.x + grapple.velocity.x * deltaTime;
+        float nextY = pilotPos.y + grapple.velocity.y * deltaTime;
+        float pRadius = 0.25f;
+
+        if (!CheckWorldCollision(nextX, pilotPos.y, pRadius)) pilotPos.x = nextX;
+        if (!CheckWorldCollision(pilotPos.x, nextY, pRadius)) pilotPos.y = nextY;
+    } 
+    else 
+    {
         grapple.isAttached = false;
         isTacticalActive = false;
         pilotPos.z = 0.0f;
     }
 }
 
-void Vault17ClassManager::UpdateActiveStats() {
-    if (!isInsideVehicle) {
+void Vault17ClassManager::UpdateActiveStats() 
+{
+    if (!isInsideVehicle) 
+    {
         currentStats.isVehicleMode = false;
         currentStats.damageMultiplier = 1.0f;
         currentStats.erosionResistance = 0.0f;
 
-        switch (activePilotClass) {
+        switch (activePilotClass) 
+        {
             case PilotClass::Grapple:
-                currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.8f;
-                currentStats.weaponLabel = L"PILOT: GRAPPLE GEAR"; break;
+                currentStats.maxHealth = 100.0f; 
+                currentStats.moveSpeed = 5.8f;
+                currentStats.weaponLabel = L"PILOT: GRAPPLE GEAR"; 
+                break;
             case PilotClass::Stim:
                 currentStats.maxHealth = 100.0f; 
-                // ИСПРАВЛЕНO: Скорость строго 6.8f по канону баланса
                 currentStats.moveSpeed = isTacticalActive ? 6.8f : 5.5f; 
-                currentStats.weaponLabel = L"STIM CARBINE"; break;
+                currentStats.weaponLabel = L"STIM CARBINE"; 
+                break;
             case PilotClass::PhaseShift:
-                currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.5f;
-                currentStats.erosionResistance = isTacticalActive ? 1.0f : 0.0f; // 100% резист в фазе
-                currentStats.weaponLabel = isPhaseDimensionActive ? L"PHASE DIMENSION" : L"PHASE RIFLE"; break;
+                currentStats.maxHealth = 100.0f; 
+                currentStats.moveSpeed = 5.5f;
+                currentStats.erosionResistance = isTacticalActive ? 1.0f : 0.0f; 
+                currentStats.weaponLabel = isPhaseDimensionActive ? L"PHASE DIMENSION" : L"PHASE RIFLE"; 
+                break;
             default:
-                currentStats.maxHealth = 100.0f; currentStats.moveSpeed = 5.5f;
-                currentStats.weaponLabel = L"STANDARD CARBINE"; break;
+                currentStats.maxHealth = 100.0f; 
+                currentStats.moveSpeed = 5.5f;
+                currentStats.weaponLabel = L"STANDARD CARBINE"; 
+                break;
         }
     }
 }
+
+std::wstring Vault17ClassManager::GetActiveClassNameW() const 
+{
+    return currentStats.weaponLabel;
+}
+
+} // namespace bunker

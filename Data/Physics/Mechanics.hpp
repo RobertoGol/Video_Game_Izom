@@ -1,4 +1,17 @@
 #pragma once
+#include "../Types.hpp"
 
-// Объявляем системный процессор общих механик
-void ProcessGameMechanics(float deltaTime);
+namespace bunker {
+
+class BallisticsEngine {
+public:
+    BallisticsEngine() = default;
+
+    // 1. Высокоскоростной обсчет летящих пуль, дроби и сплеш-урона ракет без std::sqrt
+    void UpdateProjectiles(float deltaTime);
+
+    // 2. Рассредоточенный обсчет спавна и оптимизация ИИ Роя Верминов
+    void ProcessSwarmSpawning(float deltaTime);
+};
+
+} // namespace bunker

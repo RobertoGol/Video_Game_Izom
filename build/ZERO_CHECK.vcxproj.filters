@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\Projects\Izom_Game_Project\build\CMakeFiles\36993986d1dae08ee19be5da2c719e0e\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{ABC2D8A9-187C-31EA-B9B8-43006657FCA5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

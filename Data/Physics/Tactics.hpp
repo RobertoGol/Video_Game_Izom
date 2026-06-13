@@ -1,9 +1,11 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "../Types.hpp"
+#include "../Types.hpp" // Нативный Types.hpp вашего движка
 
-// Силовые параметры троса Крюка-кошки
+namespace bunker {
+
+// Силовые параметры троса Крюка-кошки (Grapple)
 struct GrapplePhysics {
     bool isAttached = false;
     Vector3D hookPoint;
@@ -41,6 +43,7 @@ public:
     // Стейт Фазового сдвига (Titanfall 2 канон)
     bool isPhaseDimensionActive; 
 
+public:
     Vault17ClassManager();
 
     void ChangePilotClass(PilotClass newClass);
@@ -56,6 +59,7 @@ public:
     void UpdateActiveStats();
     std::wstring GetActiveClassNameW() const;
     
+    // Оптимизированная физика зацепа с ААВВ-клиппингом стен бункера
     void ProcessGrapplePhysics(Vector3D& pilotPos, float deltaTime);
 };
 
@@ -64,9 +68,11 @@ public:
     const float ISO_COS = 0.8660254f; 
     const float ISO_SIN = 0.5000000f; 
     
-    float zoom; 
-    ScreenPoint centerOffset; 
+    float zoom = 55.0f; 
+    ScreenPoint centerOffset = { 0.0f, 0.0f }; 
 
     ScreenPoint WorldToScreen(const Vector3D& worldPos, const Vector3D& cameraTarget) const;
     Vector3D ScreenToWorldGround(const ScreenPoint& screenPos, const Vector3D& cameraTarget) const;
 };
+
+} // namespace bunker

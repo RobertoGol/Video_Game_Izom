@@ -1,0 +1,7 @@
+type=PunchingBag
+name=🎯 ТРЕНИРОВОЧНЫЙ МЕШОК ИНЕРЦИИ
+health=200.0
+speed=0.0
+radius=0.40
+score=50
+faction=Training
