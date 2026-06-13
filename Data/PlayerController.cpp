@@ -1,4 +1,4 @@
-#include "PlayerController.hpp"
+#include "PlayerController.hpp"  //  <-- тут ошибки 
 #include "../../main.hpp" 
 #include <cmath>
 #include <algorithm>

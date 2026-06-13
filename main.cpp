@@ -1,4 +1,4 @@
-#include "main.hpp"
+#include "main.hpp"  //  <-- тут ошибки 
 #include <chrono>
 #include <iostream>
 #include <d3dcompiler.h>

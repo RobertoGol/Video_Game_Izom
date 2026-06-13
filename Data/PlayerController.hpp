@@ -28,7 +28,7 @@ struct ObjModelMesh {
 enum class LootContainerType { WoodenCrate, IronSafe, DevVault };
 
 struct LootContainer {
-    Vector3D position;
+    Vector3D position;    //  <-- тут ошибки 
     LootContainerType type = LootContainerType::WoodenCrate;
     bool isOpened = false;
     float physicsRadius = 0.35f;

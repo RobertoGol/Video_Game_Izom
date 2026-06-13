@@ -1,5 +1,5 @@
 #include "Tactics.hpp"
-#include "../../main.hpp" // Допуск к глобальным playerHealth, bunkerProgression, CheckWorldCollision
+#include "../../main.hpp" // Допуск к глобальным playerHealth, bunkerProgression, CheckWorldCollision   //  <-- тут ошибки 
 #include <cmath>
 #include <algorithm>
 

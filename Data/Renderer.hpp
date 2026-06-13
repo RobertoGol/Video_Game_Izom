@@ -5,9 +5,9 @@
 namespace bunker {
 
 // Глобальная инлайновая функция перевода пикселей в NDC пространство DirectX 11
-inline ScreenPoint PixelsToNDC(float x, float y, float width, float height) 
+inline ScreenPoint PixelsToNDC(float x, float y, float width, float height)   //  <-- тут ошибки [PixelsToNDC]
 {
-    return { (x / width) * 2.0f - 1.0f, 1.0f - (y / height) * 2.0f };
+    return { (x / width) * 2.0f - 1.0f, 1.0f - (y / height) * 2.0f };  //  <-- тут ошибки [ { ]
 }
 
 // Инициализация статических таблиц тригонометрии (вызывается при старте в WinMain)

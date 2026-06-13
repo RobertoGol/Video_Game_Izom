@@ -21,7 +21,7 @@ private:
     MotorcycleSimulation m_Motorcycle;
 
     // Мировые 3D координаты физического кузова машины в сессии
-    Vector3D m_VehiclePosition = { 0.0f, 0.0f, 0.0f };
+    Vector3D m_VehiclePosition = { 0.0f, 0.0f, 0.0f };  //  <-- тут ошибки 
 
 public:
     VehicleManager() = default;
@@ -37,7 +37,7 @@ public:
 
     // Геттеры состояния для HUD и шейдеров рендеринга
     VehicleType GetActiveVehicleType() const { return m_ActiveVehicleType; }
-    Vector3D GetVehiclePosition() const      { return m_VehiclePosition; }
+    Vector3D GetVehiclePosition() const      { return m_VehiclePosition; }   //  <-- тут ошибки 
     float GetCarPressurePercent() const      { return m_SteamCar.GetPressurePercent(); }
 };
 

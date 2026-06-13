@@ -15,14 +15,14 @@ public:
     const float ISO_SIN = 0.5000000f; 
     
     float zoom = 55.0f; 
-    ScreenPoint centerOffset = { 0.0f, 0.0f }; 
+    ScreenPoint centerOffset = { 0.0f, 0.0f };   //  <-- тут ошибки 
 
     // --- НОВЫЙ ДОПOЛНИТЕЛЬНЫЙ БЛОК: РЕЖИМ FALLOUT 4 ---
     CameraViewMode currentViewMode = CameraViewMode::ClassicIsometric; // По умолчанию классика
     float cameraYaw = 0.785f;          // Угол горизонтального вращения
     float cameraPitch = 0.6f;          // Угол вертикального наклона
     float targetDistance = 8.0f;       // Расстояние до Пилота (зум)
-    Vector3D currentPosition;          // 3D координаты линзы в мире
+    Vector3D currentPosition;          // 3D координаты линзы в мире   //  <-- тут ошибки 
 
 public:
     IsometricCamera() = default;

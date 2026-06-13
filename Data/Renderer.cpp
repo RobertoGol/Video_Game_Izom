@@ -1,5 +1,5 @@
 #include "Renderer.hpp"
-#include "../main.hpp"
+#include "../main.hpp"  //  <-- тут ошибки 
 #include <cmath>
 #include <algorithm>
 

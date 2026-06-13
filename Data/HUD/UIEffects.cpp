@@ -1,4 +1,4 @@
-#include "../../main.hpp"
+#include "../../main.hpp"  //  <-- тут ошибки 
 #include "UIEffects.hpp"
 
 void RenderUIEffects(std::vector<Vertex>& vBuffer, float width, float height) {

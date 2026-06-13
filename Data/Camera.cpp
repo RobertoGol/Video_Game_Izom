@@ -1,5 +1,5 @@
 #include "Camera.hpp"
-#include "../main.hpp" // Доступ к глобальным playerPos, mouseWorldPos, cameraTarget, isAiming
+#include "../main.hpp" // Доступ к глобальным playerPos, mouseWorldPos, cameraTarget, isAiming    //  <-- тут ошибки 
 #include <cmath>
 #include <algorithm>
 

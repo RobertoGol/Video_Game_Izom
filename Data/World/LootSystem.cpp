@@ -229,7 +229,7 @@ void LootSystem::ProcessDeveloperTools(HWND hwnd, const Vector3D& pilotPos)
     // Включение/Выключение режима Мастерской на клавишу 'V'
     if (GetAsyncKeyState('V') & 0x8000) 
     {
-        if (m_vReleased) 
+        if (m_vReleased)  //  <-- тут ошибки [m_vReleased]
         {
             m_CampModeActive = !m_CampModeActive;
             m_vReleased = false;
@@ -238,7 +238,7 @@ void LootSystem::ProcessDeveloperTools(HWND hwnd, const Vector3D& pilotPos)
     } 
     else 
     {
-        m_vReleased = true;
+        m_vReleased = true;  //  <-- тут ошибки [m_vReleased]
     }
 
     if (!m_CampModeActive) return;
@@ -246,7 +246,7 @@ void LootSystem::ProcessDeveloperTools(HWND hwnd, const Vector3D& pilotPos)
     // Смена активных чертежей конструктора на СКМ (Колёсико мыши)
     if (GetAsyncKeyState(VK_MBUTTON) & 0x8000) 
     {
-        if (m_mReleased) 
+        if (m_mReleased)   //  <-- тут ошибки [m_vReleased]
         {
             int nextType = static_cast<int>(m_CurrentPreview.activeType) + 1;
             if (nextType > 2) nextType = 0;
@@ -256,7 +256,7 @@ void LootSystem::ProcessDeveloperTools(HWND hwnd, const Vector3D& pilotPos)
     } 
     else 
     {
-        m_mReleased = true;
+        m_mReleased = true;  //  <-- тут ошибки [m_vReleased]
     }
 
     // Привязка и выравнивание по сетке (Snapping)
@@ -340,7 +340,7 @@ void LootSystem::ProcessDeveloperTools(HWND hwnd, const Vector3D& pilotPos)
     }
 }
 
-void LootSystem::Render3DModelAt(std::vector<Vertex>& vBuffer, const ObjModelMesh& mesh, const Vector3D& worldPos, float r, float g, float b, float alpha)
+void LootSystem::Render3DModelAt(std::vector<Vertex>& vBuffer, const ObjModelMesh& mesh, const Vector3D& worldPos, float r, float g, float b, float alpha)  //  <-- тут ошибки [Render3DModelAt]
 {
     if (mesh.indices.empty()) return;
 
@@ -364,37 +364,37 @@ void LootSystem::Render3DModelAt(std::vector<Vertex>& vBuffer, const ObjModelMes
         ScreenPoint ndc2 = PixelsToNDC(s2.x, s2.y, 1280.0f, 720.0f);
 
         vBuffer.push_back({ ndc0.x, ndc0.y, 0.0f, r, g, b, alpha });
-        vBuffer.push_back({ ndc1.x, ndc1.y, 0.0f, r, g, b, alpha });
-        vBuffer.push_back({ ndc2.x, ndc2.y, 0.0f, r, g, b, alpha });
+        vBuffer.push_back({ ndc1.x, ndc1.y, 0.0f, r, g, b, alpha });  //  <-- тут ошибки [vBuffer][ndc1][ r, g, b, alpha ]
+        vBuffer.push_back({ ndc2.x, ndc2.y, 0.0f, r, g, b, alpha });  //  <-- тут ошибки [ndc2]
     }
 }
 
-void LootSystem::DrawCampPreviewGhost(std::vector<Vertex>& vBuffer)
+void LootSystem::DrawCampPreviewGhost(std::vector<Vertex>& vBuffer)  //  <-- тут ошибки [LootSystem]
 {
-    if (!m_CampModeActive) return;
+    if (!m_CampModeActive) return;  //  <-- тут ошибки [m_CampModeActive]
 
-    Vector3D spawnWorldPos = { static_cast<float>(m_CurrentPreview.tileX) + 0.5f, static_cast<float>(m_CurrentPreview.tileY) + 0.5f, 0.0f };
+    Vector3D spawnWorldPos = { static_cast<float>(m_CurrentPreview.tileX) + 0.5f, static_cast<float>(m_CurrentPreview.tileY) + 0.5f, 0.0f };  //  <-- тут ошибки [m_CurrentPreview]
 
     float r = m_CurrentPreview.isPlacementValid ? 0.2f : 1.0f;
     float g = m_CurrentPreview.isPlacementValid ? 1.0f : 0.2f;
     float b = 0.2f;
     float alpha = 0.45f; // Полупрозрачный голографический эффект чертежа
 
-    if (m_CurrentPreview.activeType == CampObjectType::ConcreteWall)
+    if (m_CurrentPreview.activeType == CampObjectType::ConcreteWall)  //  <-- тут ошибки [CampObjectType]
     {
-        Render3DModelAt(vBuffer, m_ModelConcreteWall, spawnWorldPos, r, g, b, alpha);
+        Render3DModelAt(vBuffer, m_ModelConcreteWall, spawnWorldPos, r, g, b, alpha);  //  <-- тут ошибки [Render3DModelAt][m_ModelConcreteWall]
     }
-    else if (m_CurrentPreview.activeType == CampObjectType::SupplyCrate)
+    else if (m_CurrentPreview.activeType == CampObjectType::SupplyCrate)  //  <-- тут ошибки [CampObjectType]
     {
-        Render3DModelAt(vBuffer, m_ModelSupplyCrate, spawnWorldPos, r, g, b, alpha);
+        Render3DModelAt(vBuffer, m_ModelSupplyCrate, spawnWorldPos, r, g, b, alpha);  //  <-- тут ошибки [Render3DModelAt][m_ModelSupplyCrate]
     }
-    else if (m_CurrentPreview.activeType == CampObjectType::DefenseTurret)
+    else if (m_CurrentPreview.activeType == CampObjectType::DefenseTurret)  //  <-- тут ошибки [CampObjectType] 
     {
-        Render3DModelAt(vBuffer, m_ModelDefenseTurret, spawnWorldPos, r, g, b, alpha);
+        Render3DModelAt(vBuffer, m_ModelDefenseTurret, spawnWorldPos, r, g, b, alpha);  //  <-- тут ошибки [Render3DModelAt][m_ModelDefenseTurret]
     }
 }
 
-void LootSystem::GiveDeveloperKit(PlayerInventory& playerInvOut)
+void LootSystem::GiveDeveloperKit(PlayerInventory& playerInvOut)  //  <-- тут ошибки [LootSystem][PlayerInventory][playerInvOut]
 {
     playerInvOut.ClearInventory();
 
@@ -412,4 +412,5 @@ void LootSystem::GiveDeveloperKit(PlayerInventory& playerInvOut)
     std::cout << "[DEV] Активирован инструментарий отладки. Чит-предметы занесены в память." << std::endl;
 }
 
+}
 } // namespace bunker
