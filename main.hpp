@@ -1,10 +1,11 @@
 #pragma once
+#define WIN32_LEAN_AND_MEAN // Жесткая изоляция от конфликтов Winsock 1 и Winsock 2
+#define _WINSOCKAPI_        // Полная блокировка старого заголовочного файла winsock.h
 
 #ifndef NOMINMAX
 #define NOMINMAX // Защита от конфликта макросов min/max в Windows.h
 #endif
 
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <d3d11.h>
 #include <vector>
@@ -17,17 +18,8 @@
 #include "Data/RetroShader.hpp"             // Шейдер лежит в Data
 #include "Data/PlayerController.hpp"        // Контроллер лежит в Data
 
-// ТOЧЕЧНЫЙ ФИКС: Явно объявляем типы внутри bunker, если Types.hpp забаговался
-namespace bunker {
-    enum class UnitMode : int;
-    struct Vector3D;
-    struct ScreenPoint;    
-    struct Vault17GridState;
-    struct Vault17Progression;
-}
-
 #include "Player/Player.hpp"                // ПРАВИЛЬНО: Папка Player лежит в корне
-#include "Player/Inventory.hpp"             // Исправлено: убираем Data/
+#include "Player/Inventory.hpp"             // Inventory лежит в Player
 #include "Player/SaveSystem.hpp"            // Исправлено: SaveSystem лежит в Player
 
 #include "Data/Physics/Tactics.hpp"         
@@ -64,14 +56,14 @@ extern bunker::IsometricCamera isoCamera;
 extern bunker::Vector3D mouseWorldPos;
 extern bunker::ScreenPoint currentMouseScreenPos;
 
-extern std::vector<Bullet> bullets;
-extern std::vector<Enemy> enemies;
+extern std::vector<bunker::Bullet> bullets;
+extern std::vector<bunker::Enemy> enemies;
 extern float enemySpawnTimer;
 
 extern bunker::Vault17ClassManager gameClasses;
 extern bunker::Vault17GridState regionalGrid;
 extern bunker::VanguardTitan titanSimulation; // Наш ИИ БТ-7274
-extern TitanAlly titan;
+extern bunker::TitanAlly titan;
 extern bunker::Vector3D towerPosition;
 extern bool isAiming;
 extern float baseZoom;
@@ -87,10 +79,10 @@ extern ID3D11PixelShader*      g_pPixelShader;
 extern ID3D11InputLayout*      g_pInputLayout;
 extern ID3D11Buffer*           g_pVertexBuffer;
 
-// СЕТКА СЕКТОРОВ И ЭКОСИСТЕМЫ УБЕЖИЩА 17
-extern int currentSectorMap[MAP_WIDTH][MAP_HEIGHT];
-extern int wallDurability[MAP_WIDTH][MAP_HEIGHT];
-extern float etherErosionMap[MAP_WIDTH][MAP_HEIGHT];
+// СЕТКА СЕКТОРОВ И ЭКОСИСТЕМЫ УБЕЖИЩА 17 (Исправлено добавлением префикса bunker::)
+extern int currentSectorMap[bunker::MAP_WIDTH][bunker::MAP_HEIGHT];
+extern int wallDurability[bunker::MAP_WIDTH][bunker::MAP_HEIGHT];
+extern float etherErosionMap[bunker::MAP_WIDTH][bunker::MAP_HEIGHT];
 
 // ИНВЕНТАРЬ ИГРОКА
 extern bunker::PlayerInventory g_PlayerInventory;

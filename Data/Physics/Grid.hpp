@@ -1,8 +1,13 @@
 #pragma once
+#include <algorithm>
 #include <vector>
 #include "../Types.hpp" // Нативный Types.hpp вашего движка
 
 namespace bunker {
+
+// Опережающее объявление типов для разрыва циклических зависимостей
+struct Enemy;
+struct Bullet;
 
 // Структура ячейки сетки для кэширования динамических объектов (пуль/врагов)
 struct GridCell {
@@ -18,9 +23,6 @@ private:
 
 public:
     SpatialGridManager() = default;
-
-    // Сброс и полная очистка динамических списков сетки каждый кадр перед обновлением
-    void ClearDynamicData();
 
     // Быстрая вставка индексов сущностей в соответствующие ячейки на основе их позиций
     void InsertEnemies(const std::vector<Enemy>& globalEnemies);

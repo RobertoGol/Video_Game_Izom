@@ -1,5 +1,6 @@
 #pragma once
 #include "../../Types.hpp"
+#include <cmath> // Проверь, есть ли эта строка!
 
 namespace bunker {
 
@@ -16,8 +17,8 @@ public:
     void UpdateCarPhysics(Vector3D& carPos, float deltaTime) 
     {
         Vector3D inputDir = { 0.0f, 0.0f, 0.0f };
-        if (GetAsyncKeyState('W') & 0x8000) { inputDir.x += 1.0f; inputDir.y -= 1.0f; m_SteamPressure = std::min(m_MaxPressure, m_SteamPressure + 40.0f * deltaTime); }
-        else { m_SteamPressure = std::max(0.0f, m_SteamPressure - 60.0f * deltaTime); }
+        if (GetAsyncKeyState('W') & 0x8000) { inputDir.x += 1.0f; inputDir.y -= 1.0f; m_SteamPressure = (std::min)(m_MaxPressure, m_SteamPressure + 40.0f * deltaTime); }
+        else { m_SteamPressure = (std::max)(0.0f, m_SteamPressure - 60.0f * deltaTime); }
         
         if (GetAsyncKeyState('S') & 0x8000) { inputDir.x -= 1.0f; inputDir.y += 1.0f; }
         if (GetAsyncKeyState('A') & 0x8000) { m_HullAngle -= 1.5f * deltaTime; }

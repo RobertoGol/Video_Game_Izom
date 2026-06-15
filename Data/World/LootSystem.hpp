@@ -1,109 +1,55 @@
-#pragma once
-#include <vector>
-#include <string>
-#include "../../Types.hpp"
-#include "../../../Player/Inventory.hpp"
+#pragma once // Защита от повторного включения этого файла компилятором во время сборки
+#include <vector> // Подключаем стандартный динамический массив std::vector для хранения списков
+#include <string> // Подключаем работу с текстовыми строками std::string для путей к файлам моделей
+#include <windows.h> // Подключаем API Windows, чтобы компилятор узнал системный тип дескриптора окна (HWND)
+#include "../../Types.hpp" // Подключаем главный глобальный хаб типов (там лежат Vector3D, LootContainer и т.д.)
+#include "../../Player/Inventory.hpp" // Подключаем инвентарь, чтобы система лута могла выдавать предметы игроку
 
-namespace bunker {
+namespace bunker { // Входим в главное пространство имен игры
 
-// Перечисление объектов строительства в стиле C.A.M.P. из Fallout 76
-enum class CampObjectType 
-{
-    ConcreteWall,  // Железобетонная стена
-    DefenseTurret, // Автоматическая защитная турель реле связи
-    SupplyCrate    // Кастомный ящик для лута базы
-};
-
-// Структура текущего строительного силуэта (Ghost Preview)
-struct CampPreview 
-{
-    int tileX = 0;
-    int tileY = 0;
-    CampObjectType activeType = CampObjectType::ConcreteWall;
-    bool isPlacementValid = false; // Зеленый силуэт (true) / Красный силуэт (false)
-};
-
-// Структура для хранения сырой 3D-геометрии из .obj файлов папки LootAndThings
-struct ObjModelMesh 
-{
-    std::vector<Vector3D> vertices;
-    std::vector<int> indices; // Индексы треугольников для конвейера Draw
-};
-
-enum class LootContainerType 
-{ 
-    WoodenCrate, 
-    IronSafe, 
-    DevVault 
-};
-
-struct LootContainer 
-{
-    Vector3D position;
-    LootContainerType type = LootContainerType::WoodenCrate;
-    bool isOpened = false;
-    float physicsRadius = 0.35f;
-    std::vector<InventoryItem> containsItems;
-};
-
-class LootSystem 
-{
+// Все структуры данных (CampObjectType, CampPreview, ObjModelMesh, LootContainer)
+// теперь автоматически читаются компилятором из единого центра Types.hpp.
+// Это на 100% защищает движок от критической ошибки переопределения типов C2011!
+class LootSystem { // Объявляем класс системы лута и строительной мастерской
 private:
-    std::vector<LootContainer> m_Containers;
-    float m_ContainerSpawnTimer = 0.0f;
-
-    // Параметры Мастерской C.A.M.P.
-    bool m_CampModeActive = false;
-    CampPreview m_CurrentPreview;
-
-    // Переменные триггеров кнопок перенесены в поля класса для фикса областей видимости
-    bool m_vReleased = true;
-    bool m_mReleased = true;
-
-    // Хранилище полигонов для кэшированных 3D моделей
-    ObjModelMesh m_ModelConcreteWall;
-    ObjModelMesh m_ModelSupplyCrate;
-    ObjModelMesh m_ModelDefenseTurret;
+    std::vector<LootContainer> m_Containers; // Динамический массив (список) всех заспавненных сундуков в текущей сессии
+    float m_ContainerSpawnTimer = 0.0f; // Внутренний таймер для отсчета времени между генерацией новых сундуков
+    bool m_CampModeActive = false; // Флаг: включен ли сейчас режим строительства лагеря C.A.M.P. (true/false)
+    CampPreview m_CurrentPreview; // Объект текущего строительного силуэта (хранит координаты сетки и тип постройки)
+    bool m_vReleased = true; // Триггер для фиксации отжатия клавиши 'V' (чтобы режим строительства не мигал)
+    bool m_mReleased = true; // Триггер для фиксации отжатия клавиши 'M' (для безопасного переключения интерфейса)
+    // --- БЛОК 3D КЭША: Хранилище полигонов для .obj моделей из папки LootAndThings ---
+    ObjModelMesh m_ModelConcreteWall; // Полигональная сетка (меш) для железобетонной защитной стены
+    ObjModelMesh m_ModelSupplyCrate; // Полигональная сетка для кастомного ящика снабжения базы
+    ObjModelMesh m_ModelDefenseTurret; // Полигональная сетка для автоматической защитной турели реле связи
 
 public:
-    LootSystem() = default;
-    ~LootSystem() = default;
-
-    // Высокопроизводительный построчный парсер Wavefront .obj файлов
+    LootSystem() = default; // Конструктор по умолчанию (вызывается при создании экземпляра системы)
+    ~LootSystem() = default; // Деструктор по умолчанию (безопасно очищает систему при выходе из игры)
+    // Высокопроизводительный построчный парсер Wavefront .obj файлов (загружает 3D-модели с диска в память)
     bool LoadObjGeometry(const std::string& filePath, ObjModelMesh& meshOut);
-
-    // Первичный импорт всей папки LootAndThings при старте сессии
+    // Первичный импорт всей папки LootAndThings при старте игровой сессии
     void Initialize3DModelsRegistry();
-
-    // Динамический спавн сундуков на свободных тайлах сессии
+    // Динамический игровой цикл спавна сундуков на свободных тайлах карты
     void UpdateLootSpawning(float deltaTime);
-
-    // Процедурный рандомайзер содержимого сундука на основе весов редкости
+    // Процедурный рандомайзер содержимого сундука на основе таблицы весов редкости предметов
     void GenerateRandomLoot(LootContainer& containerOut);
-
-    // Механика взаимодействия Пилота с сундуком (Клавиша 'E') с сетевой синхронизацией
+    // Механика взаимодействия Пилота с сундуком (по нажатию клавиши 'E') с сетевой синхронизацией
     void ProcessContainerInteraction(Vector3D& pPos);
-
-    // Сетевой хэндлер: Вскрытие сундука на клиентах по сигналу из сети
+    // Сетевой хэндлер: принудительное вскрытие сундука на клиентах по сигналу из сети (для мультиплеера)
     void RemoteOpenCrate(float worldX, float worldY);
-
     // Модернизированный процессор Мастерской C.A.M.P. в стиле Fallout 4/76 и Garry's Mod
     void ProcessDeveloperTools(HWND hwnd, const Vector3D& pilotPos);
-
-    // Отрисовка 3D-силуэта постройки на основе загруженного .obj меша
+    // Отрисовка полупрозрачного 3D-силуэта будущей постройки на основе загруженного .obj меша
     void DrawCampPreviewGhost(std::vector<Vertex>& vBuffer);
-
-    // Универсальный метод проецирования 3D моделей в изометрический мир
+    // Универсальный метод проецирования и отрисовки 3D моделей в изометрический игровой мир
     void Render3DModelAt(std::vector<Vertex>& vBuffer, const ObjModelMesh& mesh, const Vector3D& worldPos, float r, float g, float b, float alpha);
-
-    // Generation Чит-Предметов и Оружия Разработчика
+    // Функция генерации чит-предметов и каноничного оружия разработчика в рюкзак игрока
     void GiveDeveloperKit(PlayerInventory& playerInvOut);
-
-    // Сброс и кэширование при смене ячейки карты
+    // Сброс и полная очистка динамических списков сундуков при смене или перезагрузке ячейки карты
     void ClearContainers() { m_Containers.clear(); }
+    // Возвращает ссылку на текущий массив сундуков для внешних систем (например, для рендерера)
     std::vector<LootContainer>& GetContainers() { return m_Containers; }
 };
-
-extern LootSystem g_LootSystem;
-
-} // namespace bunker
+extern LootSystem g_LootSystem; // Объявляем внешнюю глобальную шину данных системы лута, доступную для main.cpp
+} // namespace bunker // Закрываем пространство имен bunker

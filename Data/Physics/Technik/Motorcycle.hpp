@@ -1,5 +1,7 @@
 #pragma once
 #include "../../Types.hpp"
+#include <cmath> 
+#include <algorithm> // Гарантирует работу std::min и std::max
 
 namespace bunker {
 
@@ -16,8 +18,8 @@ public:
     void UpdateMotorcyclePhysics(Vector3D& bikePos, float deltaTime) 
     {
         bool moving = false;
-        if (GetAsyncKeyState('W') & 0x8000) { m_CurrentSpeed = std::min(m_MaxSpeed, m_CurrentSpeed + 15.0f * deltaTime); moving = true; }
-        if (GetAsyncKeyState('S') & 0x8000) { m_CurrentSpeed = std::max(-3.0f, m_CurrentSpeed - 20.0f * deltaTime); moving = true; }
+        if (GetAsyncKeyState('W') & 0x8000) { m_CurrentSpeed = (std::min)(m_MaxSpeed, m_CurrentSpeed + 15.0f * deltaTime); moving = true; }
+        if (GetAsyncKeyState('S') & 0x8000) { m_CurrentSpeed = (std::max)(-3.0f, m_CurrentSpeed - 20.0f * deltaTime); moving = true; }
         
         if (GetAsyncKeyState('A') & 0x8000) { m_LeanAngle -= 3.2f * deltaTime; } // Высокая скорость разворота
         if (GetAsyncKeyState('D') & 0x8000) { m_LeanAngle += 3.2f * deltaTime; }
@@ -32,7 +34,8 @@ public:
         float nextY = bikePos.y + m_Velocity.y * deltaTime;
 
         if (!CheckWorldCollision(nextX, bikePos.y, 0.3f)) bikePos.x = nextX;
-        if (!CheckWorldCollision(carPos.x, nextY, 0.3f)) bikePos.y = nextY;
+        // Исправлено: carPos.x заменено на bikePos.x для устранения ошибки компилятора
+        if (!CheckWorldCollision(bikePos.x, nextY, 0.3f)) bikePos.y = nextY;
     }
 };
 

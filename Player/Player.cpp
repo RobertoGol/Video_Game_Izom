@@ -127,7 +127,7 @@ void UpdatePlayerLogic(float deltaTime, float windowWidth, float windowHeight, c
                             m.splashRadius = 2.4f;
                             m.targetPos = mouseWorldPos;
                             m.targetPos.x += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
-                            m_targetPos.y += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+                            m.targetPos.y += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
                             bullets.push_back(m);
                         }
                     }

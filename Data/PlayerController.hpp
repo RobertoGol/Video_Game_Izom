@@ -1,80 +1,57 @@
 #pragma once
+#include <windows.h> // Обеспечивает тип HWND для CaptureWin32Input
 #include <vector>
-#include <string>
-#include "../../Types.hpp"
-#include "../../Player/Inventory.hpp"
+#include "Types.hpp" // Базовые типы Vector3D и Vertex вашего движка
 
 namespace bunker {
 
-enum class CampObjectType {
-    ConcreteWall,
-    DefenseTurret,
-    SupplyCrate
+// Структура для хранения сырого физического ввода от Win32 API в текущем кадре
+struct CustomPlayerInput {
+    float moveForward = 0.0f;
+    float moveStrafe = 0.0f;
+    bool isSprinting = false;
+    bool isDiving = false;
+    bool isAiming = false;
 };
 
-struct CampPreview {
-    int tileX = 0;
-    int tileY = 0;
-    CampObjectType activeType = CampObjectType::ConcreteWall;
-    bool isPlacementValid = false;
-};
-
-// Простая структура для хранения геометрии из .obj файла
-struct ObjModelMesh {
-    std::vector<Vector3D> vertices;
-    std::vector<int> indices; // Индексы треугольников для Draw-вызова
-};
-
-enum class LootContainerType { WoodenCrate, IronSafe, DevVault };
-
-struct LootContainer {
-    Vector3D position;    //  <-- тут ошибки 
-    LootContainerType type = LootContainerType::WoodenCrate;
-    bool isOpened = false;
-    float physicsRadius = 0.35f;
-    std::vector<InventoryItem> containsItems;
-};
-
-class LootSystem {
+class PlayerController {
 private:
-    std::vector<LootContainer> m_Containers;
-    float m_ContainerSpawnTimer = 0.0f;
+    // Параметры выносливости Пилота (Менеджмент костюма)
+    float m_CurrentStamina = 100.0f;
+    float m_MaxStamina = 100.0f;
+    float m_StaminaDrain = 30.0f;
+    float m_StaminaRegen = 15.0f;
 
-    bool m_CampModeActive = false;
-    CampPreview m_CurrentPreview;
+    // Параметры физики скольжения персонажа
+    Vector3D m_Velocity = { 0.0f, 0.0f, 0.0f };
+    float m_WalkSpeed = 4.0f;
+    float m_SprintSpeed = 7.0f;
+    float m_Acceleration = 10.0f;
+    float m_Deceleration = 8.0f;
 
-    // --- БЛОК 3D КЭША: Хранилище полигонов для .obj моделей ---
-    ObjModelMesh m_ModelConcreteWall;
-    ObjModelMesh m_ModelSupplyCrate;
-    ObjModelMesh m_ModelDefenseTurret;
+    // Параметры механики нырка (Dive) в стиле Helldivers 2
+    bool m_IsDiving = false;
+    float m_DiveTimer = 0.0f;
+    Vector3D m_DiveDirection = { 0.0f, 0.0f, 0.0f };
+
+    // Текущий круговой угол взгляда Пилота (в градусах от 0 до 360)
+    float m_FacingAngle = 0.0f;
 
 public:
-    LootSystem() = default;
+    PlayerController() = default;
+    ~PlayerController() = default;
 
-    // Высокопроизводительный построчный парсер Wavefront .obj файлов
-    bool LoadObjGeometry(const std::string& filePath, ObjModelMesh& meshOut);
+    // Метод физического опроса клавиатуры
+    void CaptureWin32Input(HWND hwnd, CustomPlayerInput& inputOut);
 
-    // Первичный импорт всей папки LootAndThings при старте сессии
-    void Initialize3DModelsRegistry();
+    // Главный цикл обновления движения, который вызывается каждый кадр из main.cpp
+    void UpdateMovement(HWND hwnd, float deltaTime, float wWidth, float wHeight, float& playerRadius);
 
-    void UpdateLootSpawning(float deltaTime);
-    void GenerateRandomLoot(LootContainer& containerOut);
-    void ProcessContainerInteraction(Vector3D& pPos);
-    void RemoteOpenCrate(float worldX, float worldY);
-    void ProcessDeveloperTools(HWND hwnd, const Vector3D& pilotPos);
+    // Вспомогательная тригонометрия расчета взгляда
+    float CalculateFacingAngle(const Vector3D& pPos, const Vector3D& mPos);
 
-    // Отрисовка 3D-силуэта постройки на основе загруженного .obj меша!
-    void DrawCampPreviewGhost(std::vector<Vertex>& vBuffer);
-
-    // Вспомогательный метод отрисовки 3D моделей в игровом мире
-    void Render3DModelAt(std::vector<Vertex>& vBuffer, const ObjModelMesh& mesh, const Vector3D& worldPos, float r, float g, float b, float alpha);
-
-    void GiveDeveloperKit(PlayerInventory& playerInvOut);
-
-    void ClearContainers() { m_Containers.clear(); }
-    std::vector<LootContainer>& GetContainers() { return m_Containers; }
+    // Геттер для получения угла поворота при отрисовке спрайта
+    float GetFacingAngle() const { return m_FacingAngle; }
 };
-
-extern LootSystem g_LootSystem;
 
 } // namespace bunker

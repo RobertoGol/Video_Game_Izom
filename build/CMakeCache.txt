@@ -26,6 +26,9 @@ BunkerProtocolEngine_SOURCE_DIR:STATIC=D:/Projects/Izom_Game_Project
 //Path to a program.
 CMAKE_AR:FILEPATH=D:/Programm/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.50.35717/bin/Hostx64/x64/lib.exe
 
+//No help, variable specified on the command line.
+CMAKE_BUILD_TYPE:UNINITIALIZED=Release
+
 //Semicolon separated list of supported configuration types, only
 // supports Debug, Release, MinSizeRel, and RelWithDebInfo, anything
 // else will be ignored.

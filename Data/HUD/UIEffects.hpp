@@ -2,4 +2,5 @@
 #include <vector>
 #include "../Types.hpp"
 
-void RenderUIEffects(std::vector<Vertex>& vBuffer, float width, float height);
+// Здесь остаются ваши объявления функций эффектов, например:
+// void RenderMuzzleFlash(std::vector<Vertex>& vBuffer, ...);
