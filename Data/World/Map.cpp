@@ -88,10 +88,10 @@ bool SessionWorldManager::SaveWorldSessionToWld(const std::string& filePath)
 void SessionWorldManager::PopulateInitialTrainingZone() 
 {
     // Настраиваем лорные координаты вышки реле связи Убежища 17
-    towerPosition.x = 9.5f;  //  <-- тут ошибки 
-    towerPosition.y = 9.5f;  //  <-- тут ошибки 
-    towerPosition.z = 0.0f;  //  <-- тут ошибки 
-    regionalGrid.towerHealth = 200.0f;  //  <-- тут ошибки 
+    towerPosition.x = 9.5f;  
+    towerPosition.y = 9.5f;  
+    towerPosition.z = 0.0f;  
+    regionalGrid.towerHealth = 200.0f;  
 
     // Закладываем стартовые аномалии Эрозии
     etherErosionMap[2][2] = 15.0f;
@@ -99,9 +99,9 @@ void SessionWorldManager::PopulateInitialTrainingZone()
     m_SessionMeta.activeVerminNests = 2;
 
     // Спавним тренировочные манекены из кэшированных .aut профилей
-    SpawnEnemyFromConfig("base", Vector3D{ 14.0f, 14.0f, 0.0f });  //  <-- тут ошибки 
-    SpawnEnemyFromConfig("Punching_Bag", Vector3D{ 14.0f, 15.0f, 0.0f });  //  <-- тут ошибки 
-    SpawnEnemyFromConfig("Target_Dummy", Vector3D{ 15.0f, 14.0f, 0.0f });  //  <-- тут ошибки 
+    SpawnEnemyFromConfig("base", Vector3D{ 14.0f, 14.0f, 0.0f });  
+    SpawnEnemyFromConfig("Punching_Bag", Vector3D{ 14.0f, 15.0f, 0.0f });  
+    SpawnEnemyFromConfig("Target_Dummy", Vector3D{ 15.0f, 14.0f, 0.0f });  
 }
 
 void SessionWorldManager::UpdateLiveWorldGrid(float deltaTime) 
@@ -117,8 +117,8 @@ void SessionWorldManager::UpdateLiveWorldGrid(float deltaTime)
                 etherErosionMap[x][y] = std::min(100.0f, etherErosionMap[x][y] + 0.35f * deltaTime);
 
                 // Если Пилот наступает на зараженный тайл — накапливаем уровень Эрозии костюма
-                float dx = playerPos.x - (static_cast<float>(x) + 0.5f);  //  <-- тут ошибки 
-                float dy = playerPos.y - (static_cast<float>(y) + 0.5f);  //  <-- тут ошибки 
+                float dx = playerPos.x - (static_cast<float>(x) + 0.5f);  
+                float dy = playerPos.y - (static_cast<float>(y) + 0.5f);  
                 
                 if ((dx * dx + dy * dy) < 0.25f) 
                 {
@@ -129,7 +129,7 @@ void SessionWorldManager::UpdateLiveWorldGrid(float deltaTime)
     }
 
     // 2. Механика осады Убежища 17 (Если база не зачищена, уровень ресурсов падает от набегов Роя)
-    if (!m_SessionMeta.isBaseCleared && regionalGrid.towerHealth > 0.0f)   //  <-- тут ошибки 
+    if (!m_SessionMeta.isBaseCleared && regionalGrid.towerHealth > 0.0f)   
     {
         // Реле связи медленно разряжается, если вокруг бушуют гнезда аномалий
         m_SessionMeta.baseSuppliesLevel = std::max(0.0f, m_SessionMeta.baseSuppliesLevel - 0.02f * m_SessionMeta.activeVerminNests * deltaTime);

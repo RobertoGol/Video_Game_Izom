@@ -1,12 +1,11 @@
 #include "Renderer.hpp"
-#include "../main.hpp"  //  <-- тут ошибки 
+#include "../main.hpp" 
 #include <cmath>
 #include <algorithm>
 
 namespace bunker {
 
 // --- РЕТРО АНИМАЦИОННЫЙ СТЕК СПРАЙТШИТОВ (DirectX 11 NDC) ---
-
 struct SpriteAnimFrame {
     float uMin, vMin, uMax, vMax;
 };
@@ -16,7 +15,6 @@ void PushAnimatedSpriteSheet(std::vector<Vertex>& buffer, float worldX, float wo
                              float facingAngleDegrees, int currentFrameIdx, int totalFramesInRow, int textureWidth, int textureHeight)
 {
     // 1. Конвертируем чистый угол 360° в один из 8 изометрических рядов спрайтшита (0 - 7)
-    // Ряды в атласе: 0=Юг, 1=Юго-Запад, 2=Запад, 3=Северо-Запад, 4=Север, 5=Северо-Восток, 6=Восток, 7=Юго-Восток
     int directionRow = 0;
     float normalizedAngle = fmod(facingAngleDegrees + 22.5f, 360.0f);
     if (normalizedAngle < 0.0f) normalizedAngle += 360.0f;
@@ -43,21 +41,23 @@ void PushAnimatedSpriteSheet(std::vector<Vertex>& buffer, float worldX, float wo
     // Строим геометрию пиксель-арт спрайта вокруг центра точки опоры (Pivot Point)
     float halfW = spriteWidth * 0.5f;
     float topY = screenCenter.y - spriteHeight; // Точка опоры спрайта — ноги персонажа
-    
-    ScreenPoint topLeft  = PixelsToNDC(screenCenter.x - halfW, topY, 1280.0f, 720.0f);
-    ScreenPoint topRight = ToNDC(screenCenter.x + halfW, topY);
-    ScreenPoint botLeft  = ToNDC(screenCenter.x - halfW, screenCenter.y);
-    ScreenPoint botRight = ToNDC(screenCenter.x + halfW, screenCenter.y);
 
-    // Запись геометрии биллборда в вершинный буфер видеокарты (Текстурные UV подмешиваются в R,G каналы для кастомного шейдера)
-    buffer.push_back({ topLeft.x,  topLeft.y,  0.0f, uMin, vMin, 1.0f, 1.0f });
+    // ИСПРАВЛЕНО: Теперь все 4 вызова используют правильное имя PixelsToNDC и строго 2 аргумента!
+    ScreenPoint topLeft  = PixelsToNDC(screenCenter.x - halfW, topY);
+    ScreenPoint topRight = PixelsToNDC(screenCenter.x + halfW, topY);
+    ScreenPoint botLeft  = PixelsToNDC(screenCenter.x - halfW, screenCenter.y);
+    ScreenPoint botRight = PixelsToNDC(screenCenter.x + halfW, screenCenter.y);
+
+    // Запись геометрии биллборда в вершинный буфер видеокарты
+    buffer.push_back({ topLeft.x, topLeft.y, 0.0f, uMin, vMin, 1.0f, 1.0f });
     buffer.push_back({ topRight.x, topRight.y, 0.0f, uMax, vMin, 1.0f, 1.0f });
-    buffer.push_back({ botLeft.x,  botLeft.y,  0.0f, uMin, vMax, 1.0f, 1.0f });
-
-    buffer.push_back({ botLeft.x,  botLeft.y,  0.0f, uMin, vMax, 1.0f, 1.0f });
+    buffer.push_back({ botLeft.x, botLeft.y, 0.0f, uMin, vMax, 1.0f, 1.0f });
+    
+    buffer.push_back({ botLeft.x, botLeft.y, 0.0f, uMin, vMax, 1.0f, 1.0f });
     buffer.push_back({ topRight.x, topRight.y, 0.0f, uMax, vMin, 1.0f, 1.0f });
     buffer.push_back({ botRight.x, botRight.y, 0.0f, uMax, vMax, 1.0f, 1.0f });
 }
 
-// ... Ваши прошлые функции InitializeRendererTables и PushCircle остаются без изменений ниже
+// ... функции InitializeRendererTables и PushCircle остаются ниже без изменений ...
+
 } // namespace bunker

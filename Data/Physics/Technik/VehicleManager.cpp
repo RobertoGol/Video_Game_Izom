@@ -1,3 +1,5 @@
+#include <windows.h>
+
 #include "VehicleManager.hpp"
 #include "../../../main.hpp" // Доступ к глобальным playerPos, playerMode и т.д.
 

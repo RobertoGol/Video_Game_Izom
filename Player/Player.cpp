@@ -1,5 +1,5 @@
 #include "Player.hpp"
-#include "../PlayerController.hpp" // Наш созданный ранее PlayerController    //  <-- тут ошибки 
+#include "../PlayerController.hpp" // Наш созданный ранее PlayerController    
 #include "../../main.hpp"          // Доступ к глобальным переменным (bullets, titan, fireCooldown и т.д.)
 #include <cmath>
 #include <algorithm>

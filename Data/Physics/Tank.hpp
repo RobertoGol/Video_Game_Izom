@@ -39,7 +39,7 @@ private:
     const float m_ExclusionRadiusSq = 36.0f; // Квадрат 6.0 метров (Anti-Blocking сфера безопасности)
 
     // Внутренние физические векторы и ретро-профили
-    Vector3D m_Velocity = { 0.0f, 0.0f, 0.0f };    //  <-- тут ошибки 
+    Vector3D m_Velocity = { 0.0f, 0.0f, 0.0f };    
     AncientLoadout m_ActiveLoadout = AncientLoadout::XO16_SolidKinetic;
     BallisticCamProfile m_CurrentCamProfile;
 

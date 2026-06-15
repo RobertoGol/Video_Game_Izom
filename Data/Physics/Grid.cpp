@@ -2,7 +2,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace bunker {  //  <-- тут ошибки 
+namespace bunker {  
 
 void SpatialGridManager::ClearDynamicData() 
 {
@@ -33,8 +33,8 @@ void SpatialGridManager::InsertEnemies(const std::vector<Enemy>& globalEnemies)
 
 void SpatialGridManager::InsertBullets(const std::vector<Bullet>& globalBullets) 
 {
-    for (size_t i = 0; i & outTileCoords) const   //  <-- тут ошибки [outTileCoords]
-{  //  <-- тут ошибки 
+    for (size_t i = 0; i & outTileCoords) const   [outTileCoords]
+{  
     outTileCoords.clear();
 
     // Вычисляем охватывающую рамку (AABB) объекта в координатах сетки
@@ -57,4 +57,4 @@ void SpatialGridManager::InsertBullets(const std::vector<Bullet>& globalBullets)
     }
 }
 
-} // namespace bunker  //  <-- тут ошибки 
+} // namespace bunker  

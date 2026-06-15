@@ -1,41 +1,44 @@
 #pragma once
-#define WIN32_LEAN_AND_MEAN // Жесткая изоляция от конфликтов Winsock 1 и Winsock 2
-#define _WINSOCKAPI_        // Полная блокировка старого заголовочного файла winsock.h
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN // Жесткая изоляция: запрещает Windows.h подключать старый Winsock 1.0
+#endif
 
 #ifndef NOMINMAX
 #define NOMINMAX // Защита от конфликта макросов min/max в Windows.h
 #endif
 
+#define _WINSOCKAPI_ // Явное перекрытие заголовочного файла winsock.h
 #include <windows.h>
 #include <d3d11.h>
 #include <vector>
 #include <string>
 
 // ПОДКЛЮЧЕНИЕ ВСЕХ ОБЛЕГЧЕННЫХ ПОДСИСТЕМ СТРОГО ПО ПУТЯМ ВАШЕГО ПРОЕКТА
-#include "Data/Types.hpp"                   // Файл Types лежит прямо в папке Data
-#include "Data/Camera.hpp"                  // Камера лежит прямо в Data, без подпапок
-#include "Data/Renderer.hpp"                // Рендерер лежит в Data
-#include "Data/RetroShader.hpp"             // Шейдер лежит в Data
-#include "Data/PlayerController.hpp"        // Контроллер лежит в Data
+#include "Data/Types.hpp"            // Файл Types лежит прямо в папке Data
+#include "Data/Camera.hpp"           // Камера лежит прямо в Data, без подпапок
+#include "Data/Renderer.hpp"         // Рендерер лежит в Data
+#include "Data/RetroShader.hpp"      // Шейдер лежит в Data
+#include "Data/PlayerController.hpp" // Контроллер лежит в Data
 
-#include "Player/Player.hpp"                // ПРАВИЛЬНО: Папка Player лежит в корне
-#include "Player/Inventory.hpp"             // Inventory лежит в Player
-#include "Player/SaveSystem.hpp"            // Исправлено: SaveSystem лежит в Player
+#include "Player/Player.hpp"     // ПРАВИЛЬНО: Папка Player лежит в корне
+#include "Player/Inventory.hpp"  // Inventory лежит в Player
+#include "Player/SaveSystem.hpp" // Исправлено: SaveSystem лежит в Player
 
-#include "Data/Physics/Tactics.hpp"         
-#include "Data/Physics/Tank.hpp"            
-#include "Data/Physics/Collisions.hpp"      
-#include "Data/Physics/Mechanics.hpp"       
-#include "Data/Physics/Grid.hpp"            
+#include "Data/Physics/Tactics.hpp"
+#include "Data/Physics/Tank.hpp"
+#include "Data/Physics/Collisions.hpp"
+#include "Data/Physics/Mechanics.hpp"
+#include "Data/Physics/Grid.hpp"
 
 #include "Data/Physics/Technik/SteamCar.hpp"
 #include "Data/Physics/Technik/Motorcycle.hpp"
 #include "Data/Physics/Technik/VehicleManager.hpp"
 
-#include "Data/World/Map.hpp"               // Исправлено: Убираем лишнюю папку Maps/
-#include "Data/bodies/Enemies.hpp"          
-#include "Data/HUD/HUD.hpp"                 
-#include "Data/HUD/UIEffects.hpp" 
+#include "Data/World/Map.hpp" // Исправлено: Убираем лишнюю папку Maps/
+#include "Data/bodies/Enemies.hpp"
+#include "Data/HUD/HUD.hpp"
+#include "Data/HUD/UIEffects.hpp"
 
 // Forward declaration системного обработчика оконных сообщений Win32
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -70,16 +73,17 @@ extern float baseZoom;
 extern bunker::Vault17Progression bunkerProgression;
 
 // СИСТЕМНЫЕ УКАЗАТЕЛИ ГРАФИЧЕСКОГО КОНВЕЙЕРА DIRECTX 11
-extern ID3D11Device*           g_pd3dDevice;
-extern ID3D11DeviceContext*    g_pd3dDeviceContext;
-extern IDXGISwapChain*         g_pSwapChain;
-extern ID3D11RenderTargetView* g_mainRenderTargetView;
-extern ID3D11VertexShader*     g_pVertexShader;
-extern ID3D11PixelShader*      g_pPixelShader;
-extern ID3D11InputLayout*      g_pInputLayout;
-extern ID3D11Buffer*           g_pVertexBuffer;
+extern ID3D11Device *g_pd3dDevice;
+extern ID3D11DeviceContext *g_pd3dDeviceContext;
+extern IDXGISwapChain *g_pSwapChain;
+extern ID3D11RenderTargetView *g_mainRenderTargetView;
+extern ID3D11VertexShader *g_pVertexShader;
+extern ID3D11PixelShader *g_pPixelShader;
+extern ID3D11InputLayout *g_pInputLayout;
+extern ID3D11Buffer *g_pVertexBuffer;
 
 // СЕТКА СЕКТОРОВ И ЭКОСИСТЕМЫ УБЕЖИЩА 17 (Исправлено добавлением префикса bunker::)
+// MAP UNIFIED CONFIGURATION RANGE (Synchronized with Types.hpp)
 extern int currentSectorMap[bunker::MAP_WIDTH][bunker::MAP_HEIGHT];
 extern int wallDurability[bunker::MAP_WIDTH][bunker::MAP_HEIGHT];
 extern float etherErosionMap[bunker::MAP_WIDTH][bunker::MAP_HEIGHT];

@@ -1,5 +1,5 @@
 #include "Enemies.hpp"
-#include "../../main.hpp" // Доступ к глобальным массивам enemies, playerPos, towerPosition   //  <-- тут ошибки 
+#include "../../main.hpp" // Доступ к глобальным массивам enemies, playerPos, towerPosition   
 #include <fstream>
 #include <sstream>
 #include <algorithm>

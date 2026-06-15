@@ -1,5 +1,5 @@
 #include "Mechanics.hpp"
-#include "../../main.hpp" // Прямой линк ко всем extern массивам движка    //  <-- тут ошибки 
+#include "../../main.hpp" // Прямой линк ко всем extern массивам движка    
 #include "Collisions.hpp" // Интеграция нашей новой системы масс
 #include <cmath>
 #include <algorithm>

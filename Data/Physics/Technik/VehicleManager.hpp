@@ -1,7 +1,14 @@
 #pragma once
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN // Защита от конфликта Winsock 1 и Winsock 2
+#endif
+#define _WINSOCKAPI_
+#include <winsock2.h>
+#include <windows.h>
 #include "SteamCar.hpp"
 #include "Motorcycle.hpp"
-#include "../../../Data/Types.hpp" // Путь к вашему Types.hpp
+#include "../../../Data/Types.hpp" // Путь к вашему Types.hpp // Гарантирует правильное определение Vector3D для пакетов
 
 namespace bunker {
 
@@ -21,7 +28,7 @@ private:
     MotorcycleSimulation m_Motorcycle;
 
     // Мировые 3D координаты физического кузова машины в сессии
-    Vector3D m_VehiclePosition = { 0.0f, 0.0f, 0.0f };  //  <-- тут ошибки 
+    Vector3D m_VehiclePosition = { 0.0f, 0.0f, 0.0f };  
 
 public:
     VehicleManager() = default;
@@ -37,7 +44,7 @@ public:
 
     // Геттеры состояния для HUD и шейдеров рендеринга
     VehicleType GetActiveVehicleType() const { return m_ActiveVehicleType; }
-    Vector3D GetVehiclePosition() const      { return m_VehiclePosition; }   //  <-- тут ошибки 
+    Vector3D GetVehiclePosition() const      { return m_VehiclePosition; }   
     float GetCarPressurePercent() const      { return m_SteamCar.GetPressurePercent(); }
 };
 

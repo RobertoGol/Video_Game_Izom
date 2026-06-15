@@ -1,5 +1,5 @@
 #include "Tank.hpp"
-#include "../../main.hpp" // Связь со всеми глобальными extern переменными вашего движка   //  <-- тут ошибки 
+#include "../../main.hpp" // Связь со всеми глобальными extern переменными вашего движка   
 #include <cmath>
 #include <algorithm>
 #include <iostream>
