@@ -1,4 +1,4 @@
-Set - Content - Path "Data\Physics\Grid.cpp" - Value '#include "Grid.hpp"
+#include "Grid.hpp"
 #include <cmath>
 #include <utility>   // ОБЯЗАТЕЛЬНО: Дает компилятору шаблоны std::pair и std::make_pair
 #include <algorithm> // ОБЯЗАТЕЛЬНО: Дает шаблоны std::max, std::min и std::clamp
@@ -7,7 +7,7 @@ Set - Content - Path "Data\Physics\Grid.cpp" - Value '#include "Grid.hpp"
 #include "../bodies/Enemies.hpp" // Предоставляет структуру Enemy и позицию position
 #include "../../main.hpp"        // Предоставляет константы MAP_WIDTH, MAP_HEIGHT и тип Bullet
 
-    namespace bunker
+namespace bunker
 {
 
     // 1. Очищаем векторы индексов во всех 400 ячейках карты бункера (20х20)
@@ -38,45 +38,43 @@ Set - Content - Path "Data\Physics\Grid.cpp" - Value '#include "Grid.hpp"
     }
 
     // 3. ИСПРАВЛЕНО И ВОССТАНОВЛЕНО: Распределяем индексы пуль по тайлам сетки без синтаксических разрывов!
-    void SpatialGridManager::InsertBullets(const std::vector<Bullet> &globalBullets)
+    // Используем имя GetNearbyTiles и тип Vector3D строго как в вашем Grid.hpp
+    void SpatialGridManager::GetNearbyTiles(const Vector3D &entityPos, float radius, std::vector<std::pair<int, int>> &outTileCoords) const
     {
-        for (size_t i = 0; i & outTileCoords)
-            const
+        outTileCoords.clear();
+
+        // Теперь компилятор поймет эти строки, так как метод официально принадлежит классу!
+        int minX = WorldToGridX(entityPos.x - radius);
+        int maxX = WorldToGridX(entityPos.x + radius);
+        int minY = WorldToGridY(entityPos.y - radius);
+        int maxY = WorldToGridY(entityPos.y + radius);
+
+        // Резервируем память для ускорения работы
+        size_t expectedSize = static_cast<size_t>((maxX - minX + 1) * (maxY - minY + 1));
+        outTileCoords.reserve(expectedSize);
+
+        // Собираем координаты ячеек
+        for (int x = minX; x <= maxX; ++x)
+        {
+            for (int y = minY; y <= maxY; ++y)
             {
-                outTileCoords.clear();
-
-                int minX = WorldToGridX(entityPos.x - radius);
-                int maxX = WorldToGridX(entityPos.x + radius);
-                int minY = WorldToGridY(entityPos.y - radius);
-                int maxY = WorldToGridY(entityPos.y + radius);
-
-                // Защитные скобки от конфликтов макросов Windows.h (std::max/min)
-                minX = (std::max)(0, minX);
-                maxX = (std::min)(MAP_WIDTH - 1, maxX);
-                minY = (std::max)(0, minY);
-                maxY = (std::min)(MAP_HEIGHT - 1, maxY);
-
-                for (int x = minX; x <= maxX; ++x)
-                {
-                    for (int y = minY; y <= maxY; ++y)
-                    {
-                        outTileCoords.push_back(std::make_pair(x, y));
-                    }
-                }
+                outTileCoords.emplace_back(x, y);
             }
-
-        // 5. Перевод мировых координат в индексы сетки X (Теперь const законен, так как функция внутри класса!)
-        int SpatialGridManager::WorldToGridX(float worldX) const
-        {
-            int idx = static_cast<int>(worldX / m_TileSize);
-            return std::clamp(idx, 0, MAP_WIDTH - 1);
-        }
-
-        // 6. Перевод мировых координат в индексы сетки Y
-        int SpatialGridManager::WorldToGridY(float worldY) const
-        {
-            int idx = static_cast<int>(worldY / m_TileSize);
-            return std::clamp(idx, 0, MAP_HEIGHT - 1);
         }
     }
+
+    // 5. Перевод мировых координат в индексы сетки X
+    int SpatialGridManager::WorldToGridX(float worldX) const
+    {
+        int idx = static_cast<int>(worldX / m_TileSize);
+        return std::clamp(idx, 0, MAP_WIDTH - 1);
+    }
+
+    // 6. Перевод мировых координат в индексы сетки Y
+    int SpatialGridManager::WorldToGridY(float worldY) const
+    {
+        int idx = static_cast<int>(worldY / m_TileSize);
+        return std::clamp(idx, 0, MAP_HEIGHT - 1);
+    }
+
 } // namespace bunker
