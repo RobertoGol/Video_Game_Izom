@@ -1,16 +1,16 @@
-#include "Grid.hpp"
+Set - Content - Path "Data\Physics\Grid.cpp" - Value '#include "Grid.hpp"
 #include <cmath>
-#include <utility>               // FORCIBLY REQUIRED: Fixes std::make_pair C/C++(757) compiler blocks
-#include <algorithm>             // Required for std::clamp and std::max / std::min templates
-#include "../bodies/Enemies.hpp" // Чтобы компилятор знал структуру Enemy и поле position
-#include "../../main.hpp"        // Чтобы были доступны константы MAP_WIDTH и MAP_HEIGHT
+#include <utility>   // ОБЯЗАТЕЛЬНО: Дает компилятору шаблоны std::pair и std::make_pair
+#include <algorithm> // ОБЯЗАТЕЛЬНО: Дает шаблоны std::max, std::min и std::clamp
 
-namespace bunker
+// Подключаем внешние зависимости для структур сущностей твоего движка v15
+#include "../bodies/Enemies.hpp" // Предоставляет структуру Enemy и позицию position
+#include "../../main.hpp"        // Предоставляет константы MAP_WIDTH, MAP_HEIGHT и тип Bullet
+
+    namespace bunker
 {
 
-    // 1. Очищаем векторы индексов во всех 400 ячейках карты бункера
-    // Clear dynamic entity indices across all 400 bunker grid cells
-    // Очищаем векторы индексов во всех ячейках карты бункера (20х20)
+    // 1. Очищаем векторы индексов во всех 400 ячейках карты бункера (20х20)
     void SpatialGridManager::ClearDynamicCells()
     {
         for (int x = 0; x < MAP_WIDTH; ++x)
@@ -24,8 +24,6 @@ namespace bunker
     }
 
     // 2. Распределяем индексы врагов по тайлам сетки на основе их мировых координат
-    // Map living enemy positions onto corresponding spatial grid tiles
-    // Распределяем индексы врагов по тайлам сетки на основе их мировых координат
     void SpatialGridManager::InsertEnemies(const std::vector<Enemy> &globalEnemies)
     {
         for (size_t i = 0; i < globalEnemies.size(); ++i)
@@ -39,9 +37,7 @@ namespace bunker
         }
     }
 
-    // 3. ВОССТАНОВЛЕНО: Распределяем индексы пуль по тайлам сетки
-    // COMPLETE REPAIR: Map active flying projectiles onto spatial grid tiles
-    // Распределяем индексы летящих пуль по тайлам сетки (Тип Bullet теперь полностью определен через main.hpp!)
+    // 3. ИСПРАВЛЕНО И ВОССТАНОВЛЕНО: Распределяем индексы пуль по тайлам сетки без синтаксических разрывов!
     void SpatialGridManager::InsertBullets(const std::vector<Bullet> &globalBullets)
     {
         for (size_t i = 0; i & outTileCoords)
@@ -54,7 +50,7 @@ namespace bunker
                 int minY = WorldToGridY(entityPos.y - radius);
                 int maxY = WorldToGridY(entityPos.y + radius);
 
-                // ИСПРАВЛЕНО: Обернули макросы в скобки (std::max/min), чтобы Windows.h не ломал шаблоны компилятора
+                // Защитные скобки от конфликтов макросов Windows.h (std::max/min)
                 minX = (std::max)(0, minX);
                 maxX = (std::min)(MAP_WIDTH - 1, maxX);
                 minY = (std::max)(0, minY);
@@ -69,15 +65,14 @@ namespace bunker
                 }
             }
 
-        // 5. Transform world-space X vectors into clean integer grid indices
-        // Перевод мировых координат в индексы сетки с clamp-защитой
+        // 5. Перевод мировых координат в индексы сетки X (Теперь const законен, так как функция внутри класса!)
         int SpatialGridManager::WorldToGridX(float worldX) const
         {
             int idx = static_cast<int>(worldX / m_TileSize);
             return std::clamp(idx, 0, MAP_WIDTH - 1);
         }
 
-        // 6. Transform world-space Y vectors into clean integer grid indices
+        // 6. Перевод мировых координат в индексы сетки Y
         int SpatialGridManager::WorldToGridY(float worldY) const
         {
             int idx = static_cast<int>(worldY / m_TileSize);

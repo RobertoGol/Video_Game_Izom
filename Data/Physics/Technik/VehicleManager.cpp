@@ -6,6 +6,7 @@
 // Теперь идут твои стандартные инклуды файла:
 
 #include "VehicleManager.hpp"
+#include "../Mechanics.hpp"  // ОБЯЗАТЕЛЬНО: Дает машинам доступ к функции CheckWorldCollision!
 #include "../../../main.hpp" // Доступ к глобальным playerPos, playerMode и т.д.
 
 namespace bunker

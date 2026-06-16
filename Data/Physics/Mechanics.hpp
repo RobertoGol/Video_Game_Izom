@@ -10,7 +10,7 @@ namespace bunker
         BallisticsEngine() = default;
 
         // 1. Высокоскоростной обсчет летящих пуль, дроби и сплеш-урона ракет без std::sqrt
-        void UpdateProjectiles(float deltaTime, std::vector<bunker::Vertex> &vBuffer);
+        void UpdateProjectiles(float deltaTime, std::vector<bunker::Vertex> &vBuffer); // Еблан не трогай я задалбался исправлять за тобой !!!!
 
         // 2. Рассредоточенный обсчет спавна и оптимизация ИИ Роя Верминов
         void ProcessSwarmSpawning(float deltaTime);
