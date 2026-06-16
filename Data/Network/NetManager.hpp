@@ -5,25 +5,18 @@
 #endif
 
 #define _WINSOCKAPI_  // Полная блокировка старого заголовочного файла winsock.h
-#include <winsock2.h> // Подключаем только современный сетевой стек
-#include <windows.h>
-#include <ws2tcpip.h>
+#include <winsock2.h> // Сначала подключаем современный Winsock 2
+#include <windows.h>  // И только потом системный windows.h
+
 #include <vector>
+#include <ws2tcpip.h>
 #include <string>
-#include "../Types.hpp" // ПРАВИЛЬНО: Подключаем Types, чтобы менеджер увидел Vector3D без ошибок переопределения
+#include "../Data/Types.hpp" // ПРАВИЛЬНО: Подключаем Types, чтобы менеджер увидел Vector3D без ошибок переопределения
 
 // Убираем инклуд Types.hpp, чтобы избежать круговой зависимости!
 // Вместо этого делаем форвард-декларацию типов вашего движка:
 namespace bunker
 {
-    struct Vector3D
-    {
-        float x;
-        float y;
-        float z;
-    };
-    enum class UnitMode : int;
-
     const int MAX_NET_PLAYERS = 20;
     const unsigned short NET_DEFAULT_PORT = 17115;
 

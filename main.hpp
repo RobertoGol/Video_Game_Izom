@@ -1,14 +1,14 @@
 #pragma once
 
 #ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN // Жесткая изоляция: запрещает Windows.h подключать старый Winsock 1.0
+#define WIN32_LEAN_AND_MEAN // Жесткая изоляция: запрещает Windows.h автоматически подключать старый Winsock 1.0
 #endif
 
 #ifndef NOMINMAX
 #define NOMINMAX // Защита от конфликта макросов min/max в Windows.h
 #endif
 
-#define _WINSOCKAPI_ // Явное перекрытие заголовочного файла winsock.h
+#define _WINSOCKAPI_ // Полная блокировка заголовочного файла winsock.h
 #include <windows.h>
 #include <d3d11.h>
 #include <vector>

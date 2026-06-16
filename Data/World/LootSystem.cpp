@@ -6,7 +6,7 @@
 #define _WINSOCKAPI_                         // Явное перекрытие заголовочного файла winsock.h
 #include <windows.h>                         // Обеспечивает тип HWND для ProcessDeveloperTools
 #include <algorithm>                         // Обязательно для работы std::any_of и std::clamp
-#include "../../Types.hpp"                   // Гарантирует правильное определение Vector3D для всего файла!
+#include "../Data/Types.hpp"                 // Гарантирует правильное определение Vector3D для всего файла!
 #include "../../Player/Inventory.hpp"        // Подключаем класс PlayerInventory
 #include "LootSystem.hpp"                    // Наш собственный заголовочный файл
 #include "../../main.hpp"                    // Доступ к глобальным mouseWorldPos и enemies

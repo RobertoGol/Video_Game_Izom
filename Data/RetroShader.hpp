@@ -1,9 +1,10 @@
 #pragma once
 
-namespace bunker {
+namespace bunker
+{
 
-// Высокопроизводительный HLSL шейдерный код ретро-люминофора v15
-static const char* g_BunkerRetroHLSL = R"(
+    // Высокопроизводительный HLSL шейдерный код ретро-люминофора v15
+    static const char *g_BunkerRetroHLSL = R"(
 struct VS_INPUT 
 {
     float3 pos : POSITION;
