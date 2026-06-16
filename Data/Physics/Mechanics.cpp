@@ -7,6 +7,11 @@
 namespace bunker
 {
 
+    void ProcessGameMechanics(float deltaTime)
+    {
+        // ваш игровой цикл механик
+    }
+
     void BallisticsEngine::UpdateProjectiles(float deltaTime, std::vector<Vertex> &vBuffer)
     {
         if (bullets.empty())

@@ -1,11 +1,13 @@
 #pragma once
-#include "../../Types.hpp"
+#include "../../../Data/Types.hpp"
 #include "../Mechanics.hpp" // ОБЯЗАТЕЛЬНО: Дает коду ниже увидеть функцию CheckWorldCollision
 #include <cmath>
 #include <algorithm> // Гарантирует работу std::min и std::max
 
 namespace bunker
 {
+    // ГАРАНТИРОВАННЫЙ ПРОБРОС ДЛЯ КОМПИЛЯТОРА:
+    bool CheckWorldCollision(float x, float y, float radius);
 
     class MotorcycleSimulation
     {

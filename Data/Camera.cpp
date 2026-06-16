@@ -6,6 +6,11 @@
 namespace bunker
 { // ВХОДИМ В ПРОСТРАНСТВО ИМЕН ДВИЖКА (Устраняет ошибки линковки C/C++)
 
+    void UpdateHelldiversCamera(float deltaTime)
+    {
+        // ваш код логики камеры Helldivers
+    }
+
     // Обновление позиции цели камеры на основе состояния Пилота
     void IsometricCamera::UpdateHelldiversCamera(float deltaTime)
     {

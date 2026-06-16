@@ -1,10 +1,12 @@
 #pragma once
-#include "../../Types.hpp"
+#include "../../../Data/Types.hpp"
 #include "../Mechanics.hpp" // ОБЯЗАТЕЛЬНО: Дает коду ниже увидеть функцию CheckWorldCollision
 #include <cmath>            // Проверь, есть ли эта строка!
 
 namespace bunker
 {
+    // ГАРАНТИРОВАННЫЙ ПРОБРОС ДЛЯ КОМПИЛЯТОРА:
+    bool CheckWorldCollision(float x, float y, float radius);
 
     class SteamCarSimulation
     {

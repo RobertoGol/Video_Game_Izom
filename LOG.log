@@ -1,0 +1,9 @@
+Версия MSBuild 18.4.0+6e61e96ac для .NET Framework
+
+cl : командная строка  warning D9002: пропуск неизвестного параметра "/NOMINMAX" [D:\Projects\Izom_Game_Project\build\BunkerProtocol.vcxproj]
+  Camera.cpp
+  Renderer.cpp
+  Mechanics.cpp
+  Создание кода...
+  BunkerProtocol.vcxproj -> D:\Projects\Izom_Game_Project\build\Release\BunkerProtocol.exe
+  Building Custom Rule D:/Projects/Izom_Game_Project/CMakeLists.txt

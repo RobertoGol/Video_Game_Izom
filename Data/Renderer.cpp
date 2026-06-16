@@ -5,6 +5,10 @@
 
 namespace bunker
 {
+    void InitializeRendererTables()
+    {
+        // ваш код инициализации таблиц рендеринга
+    }
 
     // --- РЕТРО АНИМАЦИОННЫЙ СТЕК СПРАЙТШИТОВ (DirectX 11 NDC) ---
     struct SpriteAnimFrame
