@@ -1,4 +1,9 @@
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN // Защита от конфликта Winsock 1.0 и Winsock 2.0
+#endif
+#define _WINSOCKAPI_ // Блокируем автоматическое подключение winsock.h
 #include <windows.h>
+// Теперь идут твои стандартные инклуды файла:
 
 #include "VehicleManager.hpp"
 #include "../../../main.hpp" // Доступ к глобальным playerPos, playerMode и т.д.
