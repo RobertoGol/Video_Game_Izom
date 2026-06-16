@@ -54,6 +54,7 @@ namespace bunker
         {
             // ИИ перехватывает клапаны ног, изменяя угол стопы стоек на ходу
             float balanceOffset = std::sin(rawInput.throttle_lever) * terrain.surface_slickness * 15.0f;
+            (void)balanceOffset; // Гарантированно глушит warning C4189, превращая его в валидный код
             // Данный оффсет подмешивается в анимацию шасси
         }
 

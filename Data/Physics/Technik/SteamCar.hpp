@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Types.hpp"
-#include <cmath> // Проверь, есть ли эта строка!
+#include "../Mechanics.hpp" // ОБЯЗАТЕЛЬНО: Дает коду ниже увидеть функцию CheckWorldCollision
+#include <cmath>            // Проверь, есть ли эта строка!
 
 namespace bunker
 {

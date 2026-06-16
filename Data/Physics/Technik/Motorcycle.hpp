@@ -1,5 +1,6 @@
 #pragma once
 #include "../../Types.hpp"
+#include "../Mechanics.hpp" // ОБЯЗАТЕЛЬНО: Дает коду ниже увидеть функцию CheckWorldCollision
 #include <cmath>
 #include <algorithm> // Гарантирует работу std::min и std::max
 
